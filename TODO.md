@@ -57,19 +57,28 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 - [x] Legacy values mapped on read; stored rules upgraded at startup (idempotent)
 - [x] Spec for rule templates + dashboard written to `project_wiki/API_CONTRACTS.md`
 
-## 🤖 Phase 3 – Dashboard UI (`feature/dashboard-ui`, subagent 2)
-- [ ] Tailwind; glassmorphism panels on slate/navy shell, dark pill buttons, LTR, English-first
+## 🤖 Phase 3 – Dashboard UI (`feature/dashboard-ui`, subagent 2) — in progress
+_Status checked 2026-09-29: code written, not committed yet; its own Docker stack (`rg-ui`) is running for testing._
+- [~] Tailwind; glassmorphism panels on slate/navy shell, dark pill buttons, LTR (package.json, styles.css, vite config changed)
+- [~] Split screen: `DocumentPane` (left) + `ViolationsPanel` (right), `TopBar`, shared `ui.tsx` primitives
+- [~] Rules sidebar: `RuleForm` split out, `TemplatePicker`, "Load Sample Rules"
+- [~] Hooks: `useDocuments` (+ test), `useDocumentReport` updated
+- [~] Vitest: new tests for App, RulesPanel, DocumentsPanel, useDocuments; existing tests adapted
 - [ ] Playwright E2E (non-LLM rules only)
-- [ ] Split screen: document (left) · violations (right); click → smooth scroll + flash highlight
-- [ ] "Load Sample Rules" button
-- [ ] Filter violations by severity / rule, counts per severity
+- [ ] Commits + final report
 
-## 🤖 Phase 4 – Rule templates (`feature/rule-templates`, subagent 1)
-- [ ] PII & data leakage (regex): SSN, phone numbers, email addresses, credit cards (with Luhn check to cut false positives)
-- [ ] Acronyms & definitions: first occurrence of an acronym without "(…)" definition
-- [ ] Broken cross-references: "Section 3.2", "Figure 4", "Table 2" must exist in the document
-- [ ] `GET /api/rules/templates`, `POST /api/rules/samples` (AI sample rule created disabled)
-- [ ] Template picker in the UI (subagent 2)
+## 🤖 Phase 4 – Rule templates (`feature/rule-templates`, subagent 1) — in progress
+_Status checked 2026-09-29: 1 commit (`refactor: move Finding into its own module`), rest written but not committed._
+- [~] PII (SSN, phone, email, credit card + Luhn) → `rules/pii.py` + `test_pii.py`
+- [~] Acronyms & definitions → `rules/acronyms.py` + `test_acronyms.py`
+- [~] Broken cross-references → `rules/cross_references.py` + `test_cross_references.py`
+- [~] Templates + sample set → `rules/templates.py` + `test_templates.py`; endpoints in `routers/rules.py`
+- [~] E2E tests for `/api/rules/templates` and `/api/rules/samples`
+- [ ] Gates (ruff, mypy, pytest) + final report
+
+## ⬜ Integration (lead)
+- [ ] Review both branches, merge, run every gate together (server + client + Playwright)
+- [ ] Wiki: ADR-011 (templates), ADR-012 (UI), dev log, API contract corrections
 
 ## Later
 - [ ] Decide on data sensitivity: free-tier Gemini may use submitted content (see `.env.example`)
