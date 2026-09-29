@@ -45,7 +45,14 @@ def check_llm_rules(provider: LlmProvider, rules: list[LlmRule], blocks: list[Bl
     rule_ids = {r.id for r in rules}
 
     with ThreadPoolExecutor(max_workers=max(1, settings.llm_max_parallel)) as pool:
-        results = list(pool.map(lambda chunk: provider.find_violations(rules, chunk), chunks))
+        futures = [pool.submit(provider.find_violations, rules, chunk) for chunk in chunks]
+        try:
+            results = [f.result() for f in futures]
+        except BaseException:
+            # One chunk failed, so the AI check fails: don't spend quota on chunks not started yet
+            for f in futures:
+                f.cancel()
+            raise
 
     findings: dict[int, list[Finding]] = {r.id: [] for r in rules}
     seen: set[tuple[int, int | None, int | None, int | None]] = set()
@@ -121,31 +128,36 @@ def find_span(text: str, quote: str) -> tuple[int, int] | None:
     if idx >= 0:
         return idx, idx + len(quote)
 
-    norm_text, index_map = _normalize_with_map(text)
-    norm_quote, _ = _normalize_with_map(quote)
-    norm_quote = norm_quote.strip()
-    if not norm_quote:
-        return None
-    idx = norm_text.find(norm_quote)
-    if idx < 0:
-        idx = norm_text.lower().find(norm_quote.lower())
-    if idx < 0:
-        return None
-    return index_map[idx], index_map[idx + len(norm_quote) - 1] + 1
+    # Look-alike characters and whitespace first, then also ignoring case
+    for casefold in (False, True):
+        norm_text, index_map = _normalize_with_map(text, casefold=casefold)
+        norm_quote, _ = _normalize_with_map(quote, casefold=casefold)
+        norm_quote = norm_quote.strip()
+        if not norm_quote:
+            return None
+        idx = norm_text.find(norm_quote)
+        if idx >= 0:
+            return index_map[idx], index_map[idx + len(norm_quote) - 1] + 1
+    return None
 
 
-def _normalize_with_map(s: str) -> tuple[str, list[int]]:
-    """Normalise look-alike characters and collapse whitespace, remembering original indices."""
+def _normalize_with_map(s: str, *, casefold: bool = False) -> tuple[str, list[int]]:
+    """Normalise look-alike characters and collapse whitespace, remembering original indices.
+
+    Case folding can turn one character into several ("İ" -> "i̇", "ß" -> "ss"); every piece maps
+    back to the same original index, so offsets stay valid.
+    """
     out: list[str] = []
     index_map: list[int] = []
     for i, ch in enumerate(s):
-        ch = ch.translate(_EQUIVALENT)
-        if not ch:
-            continue
-        if _WS.fullmatch(ch):
-            if out and out[-1] == " ":
-                continue
-            ch = " "
-        out.append(ch)
-        index_map.append(i)
+        folded = ch.translate(_EQUIVALENT)
+        if casefold:
+            folded = folded.casefold()
+        for c in folded:
+            if _WS.fullmatch(c):
+                if out and out[-1] == " ":
+                    continue
+                c = " "
+            out.append(c)
+            index_map.append(i)
     return "".join(out), index_map

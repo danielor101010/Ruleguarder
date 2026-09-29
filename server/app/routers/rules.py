@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -11,6 +11,8 @@ from ..rules.templates import RULE_TEMPLATES
 from ..schemas import RuleCreate, RuleOut, RuleTemplate, RuleTypeOut, RuleUpdate, SampleRulesResult
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
+
+_SAMPLES_LOCK_KEY = 0x5A4D_504C  # any app-wide constant; identifies the "load sample rules" lock
 
 
 @router.get("/types", response_model=list[RuleTypeOut])
@@ -35,6 +37,9 @@ def list_rule_templates() -> list[RuleTemplate]:
 @router.post("/samples", response_model=SampleRulesResult, status_code=status.HTTP_201_CREATED)
 def create_sample_rules(db: Session = Depends(get_db)) -> SampleRulesResult:
     """Create every sample-set template. Idempotent: a rule whose name already exists is skipped."""
+    # Two quick clicks must not both create the set: serialise concurrent calls until commit
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _SAMPLES_LOCK_KEY})
     existing = set(db.scalars(select(Rule.name)))
     created: list[Rule] = []
     skipped: list[str] = []

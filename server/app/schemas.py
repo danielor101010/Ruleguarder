@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 # Names used before the high/medium/low rename; old rules and stored reports still load.
 LEGACY_SEVERITY = {"error": "high", "warning": "medium", "info": "low"}
@@ -69,6 +69,14 @@ class RuleUpdate(BaseModel):
     params: dict[str, Any] | None = None
     severity: Severity | None = None
     enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def _no_explicit_nulls(self) -> "RuleUpdate":
+        # A field left out keeps its value; an explicit null would reach a NOT NULL column
+        nulls = sorted(name for name in self.model_fields_set if getattr(self, name) is None)
+        if nulls:
+            raise ValueError(f"{', '.join(nulls)} cannot be null (leave a field out to keep its value)")
+        return self
 
 
 class RuleOut(RuleBase):
@@ -138,10 +146,19 @@ class CheckRequest(BaseModel):
     rule_ids: list[int] | None = None
 
 
+class FailedRule(BaseModel):
+    """A rule that could not be checked (e.g. the AI is unavailable); the other rules' results still count."""
+
+    rule_id: int
+    rule_name: str
+    error: str
+
+
 class ReportSummary(BaseModel):
     total: int
     by_severity: dict[str, int]
-    rules_checked: int
+    rules_checked: int  # rules that ran successfully
+    failed_rules: list[FailedRule] = []  # absent in reports stored before this field existed
 
     @field_validator("by_severity", mode="before")
     @classmethod

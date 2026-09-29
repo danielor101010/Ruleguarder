@@ -1,4 +1,6 @@
 import io
+import re
+import zipfile
 
 import pytest
 
@@ -56,3 +58,31 @@ def test_fonts_resolved_from_run_and_style(sample_blocks):
 def test_invalid_file_raises():
     with pytest.raises(DocxParseError):
         parse_docx(io.BytesIO(b"not a docx"))
+
+
+def _rewrite_docx(source, part: str, edit) -> io.BytesIO:
+    """A copy of the .docx with one XML part changed."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(source) as src, zipfile.ZipFile(out, "w") as dst:
+        for name in src.namelist():
+            data = src.read(name)
+            dst.writestr(name, edit(data) if name == part else data)
+    out.seek(0)
+    return out
+
+
+def test_malformed_default_font_size_is_ignored(sample_docx):
+    def bad_size(xml: bytes) -> bytes:
+        edited, count = re.subn(rb"(<w:rPrDefault>\s*<w:rPr>)", rb'\1<w:sz w:val="abc"/>', xml, count=1)
+        assert count == 1, "the template has no default run properties to break"
+        return edited
+
+    broken = _rewrite_docx(sample_docx, "word/styles.xml", bad_size)
+    blocks = parse_docx(broken)
+    assert block_containing(blocks, INTRO).runs  # parsed; Normal's own size still applies
+
+
+def test_malformed_body_raises_parse_error(sample_docx):
+    broken = _rewrite_docx(sample_docx, "word/document.xml", lambda xml: xml[: len(xml) // 2])
+    with pytest.raises(DocxParseError):
+        parse_docx(broken)

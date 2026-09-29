@@ -2,8 +2,9 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from . import models  # noqa: F401  (registers tables on Base.metadata)
 from .config import get_settings
@@ -33,6 +34,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def unexpected_error(_: Request, __: Exception) -> JSONResponse:
+    """Keep the `{"detail": ...}` error shape for bugs too. Uvicorn still logs the traceback."""
+    return JSONResponse({"detail": "Internal server error"}, status_code=500)
+
 
 app.include_router(rules.router)
 app.include_router(documents.router)

@@ -11,10 +11,12 @@ builds its form from the params JSON schema, so no client change is needed.
 """
 
 import re
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+import regex
 from pydantic import BaseModel, Field, model_validator
 
 from ..schemas import Block, Run
@@ -39,6 +41,11 @@ class RuleType:
 
 # ---------- params models ----------
 
+# User-written regexes run on the `regex` module, which supports a timeout: a pattern with
+# catastrophic backtracking, e.g. "(a+)+$", would otherwise block a worker thread for good.
+# The budget covers the whole document, per rule; exceeding it raises TimeoutError.
+REGEX_TIMEOUT_SECONDS = 2.0
+
 
 class LlmParams(BaseModel):
     instruction: str = Field(
@@ -59,13 +66,13 @@ class TextPatternParams(BaseModel):
     def _valid_regex(self) -> "TextPatternParams":
         try:
             self.compiled()
-        except re.error as exc:
+        except regex.error as exc:
             raise ValueError(f"Invalid regular expression: {exc}") from exc
         return self
 
-    def compiled(self) -> re.Pattern[str]:
-        source = self.pattern if self.is_regex else re.escape(self.pattern)
-        return re.compile(source, 0 if self.case_sensitive else re.IGNORECASE)
+    def compiled(self) -> regex.Pattern[str]:
+        source = self.pattern if self.is_regex else regex.escape(self.pattern)
+        return regex.compile(source, 0 if self.case_sensitive else regex.IGNORECASE)
 
 
 class MaxWordsParams(BaseModel):
@@ -93,10 +100,22 @@ _WORD_RE = re.compile(r"\S+")
 _SENTENCE_RE = re.compile(r"[^.!?]+[.!?]*")
 
 
+class _Deadline:
+    def __init__(self, seconds: float) -> None:
+        self._end = time.monotonic() + seconds
+
+    def remaining(self) -> float:
+        left = self._end - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("regex timed out")
+        return left
+
+
 def _check_forbidden_text(params: TextPatternParams, blocks: list[Block]) -> Iterable[Finding]:
     pattern = params.compiled()
+    deadline = _Deadline(REGEX_TIMEOUT_SECONDS)
     for block in blocks:
-        for m in pattern.finditer(block.text):
+        for m in pattern.finditer(block.text, timeout=deadline.remaining()):
             if m.end() == m.start():
                 continue
             yield Finding(f'Forbidden text "{m.group(0)}"', block.id, m.start(), m.end())
@@ -104,7 +123,8 @@ def _check_forbidden_text(params: TextPatternParams, blocks: list[Block]) -> Ite
 
 def _check_required_text(params: TextPatternParams, blocks: list[Block]) -> Iterable[Finding]:
     pattern = params.compiled()
-    if not any(pattern.search(b.text) for b in blocks):
+    deadline = _Deadline(REGEX_TIMEOUT_SECONDS)
+    if not any(pattern.search(b.text, timeout=deadline.remaining()) for b in blocks):
         yield Finding(f'Required text "{params.pattern}" was not found anywhere in the document')
 
 

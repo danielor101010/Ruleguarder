@@ -1,3 +1,4 @@
+import io
 import logging
 import uuid
 from pathlib import Path
@@ -9,9 +10,9 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db import get_db
 from ..docx_parser import DocxParseError, parse_docx
-from ..llm import LlmError, get_llm_provider
+from ..llm import get_llm_provider
 from ..models import CheckRun, Document, Rule
-from ..rules import RuleValidationError, run_rules
+from ..rules import run_rules
 from ..schemas import (
     Block,
     CheckRequest,
@@ -48,24 +49,27 @@ async def upload_document(file: UploadFile, db: Session = Depends(get_db)) -> Do
     if not content.startswith(_DOCX_MAGIC):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is not a valid .docx document")
 
+    # Parse before anything is written, so a rejected file leaves nothing behind
+    try:
+        blocks = parse_docx(io.BytesIO(content))
+    except DocxParseError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     stored_path = settings.upload_dir / f"{uuid.uuid4().hex}.docx"
     stored_path.write_bytes(content)
-
-    try:
-        blocks = parse_docx(str(stored_path))
-    except DocxParseError as exc:
-        stored_path.unlink(missing_ok=True)
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-
     doc = Document(
         filename=filename,
         stored_path=str(stored_path),
         size_bytes=len(content),
         blocks=[b.model_dump() for b in blocks],
     )
-    db.add(doc)
-    db.commit()
+    try:
+        db.add(doc)
+        db.commit()
+    except Exception:
+        stored_path.unlink(missing_ok=True)
+        raise
     return doc
 
 
@@ -77,14 +81,23 @@ def get_document(document_id: int, db: Session = Depends(get_db)) -> Document:
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(document_id: int, db: Session = Depends(get_db)) -> None:
     doc = _get_or_404(db, document_id)
-    Path(doc.stored_path).unlink(missing_ok=True)
+    stored_path = Path(doc.stored_path)
     db.delete(doc)
     db.commit()
+    # After the commit: if the DB delete fails, the document stays complete
+    try:
+        stored_path.unlink(missing_ok=True)
+    except OSError:
+        log.warning("Could not remove %s", stored_path, exc_info=True)
 
 
 @router.post("/{document_id}/check", response_model=ReportOut)
 def check_document(document_id: int, body: CheckRequest | None = None, db: Session = Depends(get_db)) -> ReportOut:
     """Run rules against the document and store the report.
+
+    A rule that can't be checked is listed in `summary.failed_rules` and the others still count.
+    Only when no rule could be checked at all does the request fail (502), so the latest
+    completed report stays the one shown.
 
     Sync handler on purpose: FastAPI runs it in a worker thread, so a long LLM call
     doesn't block the event loop.
@@ -102,14 +115,14 @@ def check_document(document_id: int, body: CheckRequest | None = None, db: Sessi
 
     blocks = [Block.model_validate(b) for b in doc.blocks]
     run = CheckRun(document_id=doc.id, rule_ids=[r.id for r in rules])
-    try:
-        llm = get_llm_provider() if any(r.type == "llm" for r in rules) else None
-        violations, summary = run_rules(rules, blocks, llm)
-    except (LlmError, RuleValidationError) as exc:
-        run.status, run.error = "failed", str(exc)
+    violations, summary = run_rules(rules, blocks, get_llm_provider)
+
+    if summary.failed_rules and summary.rules_checked == 0:
+        errors = list(dict.fromkeys(f.error for f in summary.failed_rules))
+        run.status, run.error = "failed", " ".join(errors)
         db.add(run)
         db.commit()
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"No rule could be checked. {run.error}")
 
     run.status = "completed"
     run.violations = [v.model_dump() for v in violations]

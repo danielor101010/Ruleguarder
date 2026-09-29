@@ -3,7 +3,7 @@
 import pytest
 
 from app.config import get_settings
-from app.llm import LlmBlock, LlmRule, LlmViolation
+from app.llm import LlmBlock, LlmError, LlmRule, LlmViolation
 from app.rules.llm_check import check_llm_rules, find_span
 
 from .conftest import block_containing
@@ -110,3 +110,30 @@ def test_find_span_hebrew_gershayim():
 
 def test_find_span_missing():
     assert find_span("abc", "xyz") is None
+
+
+@pytest.mark.parametrize(
+    "text,quote,expected",
+    [
+        ("xİstanbul 50 km", "Xi̇stanbul 50 KM", "xİstanbul 50 km"),  # "İ".lower() is 2 characters
+        ("İİİİ abc", "i̇i̇i̇i̇ ABC", "İİİİ abc"),
+        ("Die Straße ist 3 km lang", "STRASSE IST 3 KM", "Straße ist 3 km"),  # "ß" folds to "ss"
+    ],
+)
+def test_find_span_ignores_case_when_case_changes_length(text, quote, expected):
+    span = find_span(text, quote)
+    assert span is not None
+    start, end = span
+    assert text[start:end] == expected
+
+
+def test_failed_chunk_stops_the_remaining_chunks(sample_blocks, monkeypatch):
+    monkeypatch.setattr(get_settings(), "llm_chunk_chars", 100)
+
+    def fail(rules, blocks):
+        raise LlmError("quota")
+
+    provider = FakeProvider(fail)
+    with pytest.raises(LlmError):
+        check_llm_rules(provider, [RULE], sample_blocks)
+    assert len(provider.calls) == 1  # LLM_MAX_PARALLEL=1: the queued chunks were cancelled

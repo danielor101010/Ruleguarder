@@ -5,6 +5,7 @@ nearest heading, character offsets per run) for the rule engine to point at the
 exact place a rule was broken.
 """
 
+import logging
 import re
 from collections.abc import Iterator
 from typing import IO, Any
@@ -17,6 +18,8 @@ from docx.text.paragraph import Paragraph
 
 from .schemas import Block, Run
 
+log = logging.getLogger(__name__)
+
 _HEADING_RE = re.compile(r"^(heading|title)\s*(\d*)$", re.IGNORECASE)
 
 
@@ -26,10 +29,13 @@ class DocxParseError(ValueError):
 
 def parse_docx(source: str | IO[bytes]) -> list[Block]:
     try:
-        doc = open_docx(source)
-    except Exception as exc:  # python-docx raises a variety of zip/xml errors
+        return _parse(open_docx(source))
+    except Exception as exc:  # python-docx raises zip/xml/value errors on malformed files, while opening or reading
+        log.info("Unreadable DOCX", exc_info=True)
         raise DocxParseError(f"Could not read DOCX file: {exc}") from exc
 
+
+def _parse(doc: DocxDocument) -> list[Block]:
     defaults = _doc_defaults(doc)
     blocks: list[Block] = []
     current_heading: str | None = None
@@ -178,6 +184,7 @@ def _doc_defaults(doc: DocxDocument) -> dict[str, Any]:
         if fonts is not None:
             font = fonts.get(qn("w:ascii")) or fonts.get(qn("w:hAnsi"))
         sz = rpr.find(qn("w:sz"))
-        if sz is not None and sz.get(qn("w:val")):
-            size_pt = int(sz.get(qn("w:val"))) / 2  # stored in half-points
+        val = sz.get(qn("w:val")) if sz is not None else None
+        if val and val.isdigit():  # a malformed default size is ignored, not fatal
+            size_pt = int(val) / 2  # stored in half-points
     return {"font": font, "size_pt": size_pt}

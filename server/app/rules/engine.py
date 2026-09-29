@@ -1,12 +1,18 @@
+import logging
 from collections import Counter
+from collections.abc import Callable
 from typing import Any
 
-from ..llm import LlmProvider, LlmRule
+from pydantic import BaseModel, ValidationError
+
+from ..llm import LlmError, LlmProvider, LlmRule
 from ..models import Rule
-from ..schemas import Block, ReportSummary, Violation
+from ..schemas import Block, FailedRule, ReportSummary, Violation
 from .finding import Finding
 from .llm_check import check_llm_rules
-from .registry import LLM_RULE_TYPE, RULE_TYPES
+from .registry import REGEX_TIMEOUT_SECONDS, RULE_TYPES
+
+log = logging.getLogger(__name__)
 
 _EXCERPT_CONTEXT = 40
 
@@ -26,27 +32,51 @@ def validate_rule_params(rule_type: str, params: dict[str, Any]) -> dict[str, An
         raise RuleValidationError(str(exc)) from exc
 
 
-def run_rules(rules: list[Rule], blocks: list[Block], llm: LlmProvider | None) -> tuple[list[Violation], ReportSummary]:
-    """Run every rule against the document. Raises LlmError if the LLM call fails."""
-    findings: dict[int, list[Finding]] = {}
+def run_rules(
+    rules: list[Rule], blocks: list[Block], llm: Callable[[], LlmProvider] | None
+) -> tuple[list[Violation], ReportSummary]:
+    """Run every rule against the document.
 
-    llm_rules = [r for r in rules if r.type == LLM_RULE_TYPE]
-    if llm_rules:
-        if llm is None:
-            raise RuleValidationError("AI rules need an LLM provider, but none is configured.")
-        findings.update(
-            check_llm_rules(
-                llm,
-                [LlmRule(r.id, r.name, r.params["instruction"]) for r in llm_rules],
-                blocks,
-            )
-        )
+    Each rule is isolated: a rule that can't be checked (AI unavailable, stored params no longer
+    valid, a regex that runs too long, a checker bug) is listed in `summary.failed_rules`, and the
+    other rules' results are still returned. `llm` creates the provider; it is only called when
+    there are AI rules, so a missing API key fails those rules and nothing else.
+    """
+    findings: dict[int, list[Finding]] = {}
+    failed: dict[int, str] = {}
+    llm_rules: list[tuple[Rule, LlmRule]] = []
 
     for rule in rules:
-        rt = RULE_TYPES.get(rule.type)
-        if rt is None or rt.check is None:
-            continue
-        findings[rule.id] = list(rt.check(rt.params_model.model_validate(rule.params), blocks))
+        try:
+            rt = RULE_TYPES.get(rule.type)
+            if rt is None:
+                raise _RuleCheckError(f"Unknown rule type '{rule.type}'.")
+            params = _stored_params(rule, rt.params_model)
+            if rt.check is None:
+                llm_rules.append((rule, LlmRule(rule.id, rule.name, params.instruction)))
+                continue
+            findings[rule.id] = list(rt.check(params, blocks))
+        except _RuleCheckError as exc:
+            failed[rule.id] = str(exc)
+        except TimeoutError:
+            failed[rule.id] = (
+                f"The check took longer than {REGEX_TIMEOUT_SECONDS:g} s and was stopped. "
+                "Simplify the regular expression."
+            )
+        except Exception:
+            log.exception("Rule %s (%s) failed", rule.id, rule.type)
+            failed[rule.id] = "Internal error while checking this rule."
+
+    if llm_rules:
+        try:
+            if llm is None:
+                raise LlmError("AI rules need an LLM provider, but none is configured.")
+            findings.update(check_llm_rules(llm(), [lr for _, lr in llm_rules], blocks))
+        except LlmError as exc:
+            failed.update({rule.id: str(exc) for rule, _ in llm_rules})
+        except Exception:
+            log.exception("AI rules failed")
+            failed.update({rule.id: "Internal error while running the AI check." for rule, _ in llm_rules})
 
     by_id = {b.id: b for b in blocks}
     violations: list[Violation] = []
@@ -72,9 +102,23 @@ def run_rules(rules: list[Rule], blocks: list[Block], llm: LlmProvider | None) -
     summary = ReportSummary(
         total=len(violations),
         by_severity=dict(Counter(v.severity for v in violations)),
-        rules_checked=len(rules),
+        rules_checked=len(rules) - len(failed),
+        failed_rules=[FailedRule(rule_id=r.id, rule_name=r.name, error=failed[r.id]) for r in rules if r.id in failed],
     )
     return violations, summary
+
+
+class _RuleCheckError(Exception):
+    """A rule that can't run; the message is shown to the user."""
+
+
+def _stored_params(rule: Rule, model: type[BaseModel]) -> Any:
+    """Params as saved in the DB, validated again: a schema change can make an old rule invalid."""
+    try:
+        return model.model_validate(rule.params)
+    except ValidationError as exc:
+        details = "; ".join(f"{'.'.join(map(str, e['loc'])) or 'params'}: {e['msg']}" for e in exc.errors())
+        raise _RuleCheckError(f"This rule's settings are no longer valid ({details}). Edit and save the rule.") from exc
 
 
 def _excerpt(block: Block | None, start: int | None, end: int | None) -> str:
