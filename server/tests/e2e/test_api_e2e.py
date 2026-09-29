@@ -206,3 +206,49 @@ def test_llm_rule_finds_performance_figures(api, created, sample_docx):
     assert any("3 m" in t for t in perf_hits), report["violations"]
     # The update rate lives in a table cell
     assert any("2 seconds" in t for t in located), report["violations"]
+
+
+def _poll_check(api, check_id: int, timeout: float = 30) -> dict:
+    import time
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        status = api.get(f"/api/checks/{check_id}").json()
+        if status["status"] in {"completed", "failed", "cancelled"}:
+            return status
+        time.sleep(0.2)
+    raise AssertionError(f"check {check_id} did not finish")
+
+
+def test_background_check_reports_progress_and_result(api, created, sample_docx):
+    rule = create_rule(api, created, name="Markings (bg)", type="forbidden_text", params={"pattern": "top secret"})
+    doc = upload(api, created, sample_docx)
+    assert api.get(f"/api/documents/{doc['id']}/checks/latest").status_code == 404
+
+    res = api.post(f"/api/documents/{doc['id']}/checks", json={"rule_ids": [rule["id"]]})
+    assert res.status_code == 202, res.text
+    started = res.json()
+    assert started["status"] in {"queued", "running", "completed"}
+    assert started["document_id"] == doc["id"]
+
+    final = _poll_check(api, started["check_id"])
+    assert final["status"] == "completed"
+    assert (final["progress_done"], final["progress_total"]) == (1, 1)
+    assert final["finished_at"] is not None
+
+    assert api.get(f"/api/documents/{doc['id']}/checks/latest").json()["check_id"] == started["check_id"]
+    report = api.get(f"/api/documents/{doc['id']}/report").json()
+    assert report["check_id"] == started["check_id"]
+    assert [highlighted(report, v) for v in report["violations"]] == ["TOP SECRET"]
+
+    # Cancelling a finished check changes nothing
+    after = api.post(f"/api/checks/{started['check_id']}/cancel").json()
+    assert after["status"] == "completed"
+
+
+def test_background_check_errors(api, created, sample_docx):
+    doc = upload(api, created, sample_docx)
+    assert api.post(f"/api/documents/{doc['id']}/checks", json={"rule_ids": []}).status_code == 400
+    assert api.post("/api/documents/999999/checks", json={}).status_code == 404
+    assert api.get("/api/checks/999999").status_code == 404
+    assert api.post("/api/checks/999999/cancel").status_code == 404

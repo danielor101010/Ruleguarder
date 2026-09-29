@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 120
     # Documents longer than this are split into several LLM calls
     llm_chunk_chars: int = 60000
+    # Background checks that may run at the same time (each one runs its AI requests sequentially
+    # or up to llm_max_parallel)
+    check_workers: int = 2
     # Keep low on the free tier: parallel calls count against the per-minute quota
     llm_max_parallel: int = 1
 

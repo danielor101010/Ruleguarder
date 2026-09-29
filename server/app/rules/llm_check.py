@@ -6,12 +6,13 @@ real text - a quote the model made up can't produce a bogus highlight.
 """
 
 import re
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 
 from ..config import get_settings
-from ..llm import LlmBlock, LlmProvider, LlmRule
+from ..llm import LlmBlock, LlmProvider, LlmRule, LlmViolation
 from ..schemas import Block
 from .finding import Finding
+from .progress import CheckCancelled, NoProgress, Progress
 
 # Characters the model may silently swap (Hebrew gershayim/geresh vs ASCII quotes, dashes, NBSP...)
 _EQUIVALENT = str.maketrans(
@@ -36,21 +37,46 @@ _EQUIVALENT = str.maketrans(
 _WS = re.compile(r"\s+")
 
 
-def check_llm_rules(provider: LlmProvider, rules: list[LlmRule], blocks: list[Block]) -> dict[int, list[Finding]]:
-    """Returns findings grouped by rule id."""
+def check_llm_rules(
+    provider: LlmProvider, rules: list[LlmRule], blocks: list[Block], progress: Progress | None = None
+) -> dict[int, list[Finding]]:
+    """Returns findings grouped by rule id. Reports one progress step per finished AI request."""
+    progress = progress or NoProgress()
     settings = get_settings()
     llm_blocks = [LlmBlock(b.id, b.label, b.text) for b in blocks if b.text.strip()]
     chunks = _chunk(llm_blocks, settings.llm_chunk_chars)
     by_id = {b.id: b for b in blocks}
     rule_ids = {r.id for r in rules}
 
-    with ThreadPoolExecutor(max_workers=max(1, settings.llm_max_parallel)) as pool:
-        futures = [pool.submit(provider.find_violations, rules, chunk) for chunk in chunks]
+    if progress.cancelled():
+        raise CheckCancelled
+    results: list[list[LlmViolation]] = [[] for _ in chunks]
+    parallel = max(1, settings.llm_max_parallel)
+    # Requests are submitted lazily, at most `parallel` in flight: after a failure or a cancel no new
+    # request starts (a pre-filled pool would start the next queued request before we could stop it).
+    pending = iter(enumerate(chunks))
+    in_flight: dict[Future[list[LlmViolation]], int] = {}
+    done = 0
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+
+        def fill() -> None:
+            while len(in_flight) < parallel and (item := next(pending, None)) is not None:
+                i, chunk = item
+                in_flight[pool.submit(provider.find_violations, rules, chunk)] = i
+
         try:
-            results = [f.result() for f in futures]
+            fill()
+            while in_flight:
+                finished, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+                for future in finished:
+                    results[in_flight.pop(future)] = future.result()
+                    done += 1
+                    progress.advance(f"AI rules: part {done} of {len(chunks)}")
+                if progress.cancelled():
+                    raise CheckCancelled
+                fill()
         except BaseException:
-            # One chunk failed, so the AI check fails: don't spend quota on chunks not started yet
-            for f in futures:
+            for f in in_flight:
                 f.cancel()
             raise
 

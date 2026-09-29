@@ -178,3 +178,20 @@ class ReportOut(BaseModel):
     document: DocumentOut
     violations: list[Violation]
     summary: ReportSummary
+
+
+CheckState = Literal["queued", "running", "completed", "failed", "cancelled"]
+
+
+class CheckStatus(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    check_id: int = Field(validation_alias="id")
+    document_id: int
+    status: CheckState
+    progress_done: int = 0
+    progress_total: int = 0
+    step: str | None = None
+    error: str | None = None
+    created_at: datetime
+    finished_at: datetime | None = None

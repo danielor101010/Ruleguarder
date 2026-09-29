@@ -43,8 +43,12 @@ class CheckRun(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
-    status: Mapped[str] = mapped_column(String(20))  # completed | failed
+    status: Mapped[str] = mapped_column(String(20))  # queued | running | completed | failed | cancelled
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    progress_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    progress_total: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    step: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rule_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     violations: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
