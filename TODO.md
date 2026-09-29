@@ -11,9 +11,10 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 | `feature/e2e-tests` | `feature/gemini-integration` | ✅ committed |
 | `fix/gemini-overload-fallback` | `feature/e2e-tests` | ✅ committed |
 | `feature/quality-gates` | `fix/gemini-overload-fallback` | ✅ committed |
-| `refactor/severity-levels` | `feature/quality-gates` | next |
-| `feature/dashboard-ui` | – | planned (design decision needed) |
-| `feature/rule-templates` | – | planned |
+| `refactor/severity-levels` | `feature/quality-gates` | ✅ committed (+ spec for next two) |
+| `feature/rule-templates` | `refactor/severity-levels` | 🤖 subagent 1 working (server) |
+| `feature/dashboard-ui` | `refactor/severity-levels` | 🤖 subagent 2 working (client, parallel) |
+| integration | both of the above | ⬜ lead: merge, run all gates, wiki |
 
 ## ✅ Phase 1 – Scaffold (`feature/project-scaffold`)
 - [x] Stack: FastAPI + python-docx + PostgreSQL + React/Vite/TS + Docker (nginx)
@@ -51,18 +52,24 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 - [x] Ruff + strict mypy (server), zero findings; `tests` image runs every gate
 - [x] ESLint 10 (0 warnings) + tsc + Vitest (client), 32 tests; logic extracted to lib/ and hooks/
 
-## Phase 3 – Dashboard UI (`feature/dashboard-ui`)
-- [ ] Enterprise security dashboard look: slate / dark navy theme, LTR, English-first
-- [ ] Severity levels High / Medium / Low (red / orange / yellow) – rename from error / warning / info (API + DB + UI)
+## ✅ Severity levels (`refactor/severity-levels`)
+- [x] error/warning/info → high/medium/low (API, DB, client, colours red/orange/yellow)
+- [x] Legacy values mapped on read; stored rules upgraded at startup (idempotent)
+- [x] Spec for rule templates + dashboard written to `project_wiki/API_CONTRACTS.md`
+
+## 🤖 Phase 3 – Dashboard UI (`feature/dashboard-ui`, subagent 2)
+- [ ] Tailwind; glassmorphism panels on slate/navy shell, dark pill buttons, LTR, English-first
+- [ ] Playwright E2E (non-LLM rules only)
 - [ ] Split screen: document (left) · violations (right); click → smooth scroll + flash highlight
 - [ ] "Load Sample Rules" button
 - [ ] Filter violations by severity / rule, counts per severity
 
-## Phase 4 – Rule templates (`feature/rule-templates`)
+## 🤖 Phase 4 – Rule templates (`feature/rule-templates`, subagent 1)
 - [ ] PII & data leakage (regex): SSN, phone numbers, email addresses, credit cards (with Luhn check to cut false positives)
 - [ ] Acronyms & definitions: first occurrence of an acronym without "(…)" definition
 - [ ] Broken cross-references: "Section 3.2", "Figure 4", "Table 2" must exist in the document
-- [ ] Template picker in the UI (one click adds a pre-filled rule)
+- [ ] `GET /api/rules/templates`, `POST /api/rules/samples` (AI sample rule created disabled)
+- [ ] Template picker in the UI (subagent 2)
 
 ## Later
 - [ ] Decide on data sensitivity: free-tier Gemini may use submitted content (see `.env.example`)
