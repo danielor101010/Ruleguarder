@@ -12,7 +12,7 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 | `fix/gemini-overload-fallback` | `feature/e2e-tests` | ✅ committed |
 | `feature/quality-gates` | `fix/gemini-overload-fallback` | ✅ committed |
 | `refactor/severity-levels` | `feature/quality-gates` | ✅ committed (+ spec for next two) |
-| `feature/rule-templates` | `refactor/severity-levels` | 🤖 subagent 1 working (server) |
+| `feature/rule-templates` | `refactor/severity-levels` | ✅ done, verified (154 tests) |
 | `feature/dashboard-ui` | `refactor/severity-levels` | 🤖 subagent 2 working (client, parallel) |
 | integration | both of the above | ⬜ lead: merge, run all gates, wiki |
 
@@ -67,14 +67,13 @@ _Status checked 2026-09-29: code written, not committed yet; its own Docker stac
 - [ ] Playwright E2E (non-LLM rules only)
 - [ ] Commits + final report
 
-## 🤖 Phase 4 – Rule templates (`feature/rule-templates`, subagent 1) — in progress
-_Status checked 2026-09-29: 1 commit (`refactor: move Finding into its own module`), rest written but not committed._
-- [~] PII (SSN, phone, email, credit card + Luhn) → `rules/pii.py` + `test_pii.py`
-- [~] Acronyms & definitions → `rules/acronyms.py` + `test_acronyms.py`
-- [~] Broken cross-references → `rules/cross_references.py` + `test_cross_references.py`
-- [~] Templates + sample set → `rules/templates.py` + `test_templates.py`; endpoints in `routers/rules.py`
-- [~] E2E tests for `/api/rules/templates` and `/api/rules/samples`
-- [ ] Gates (ruff, mypy, pytest) + final report
+## ✅ Phase 4 – Rule templates (`feature/rule-templates`, subagent 1) — done, verified by lead
+_6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --strict ✅ **154 passed** (+96)._
+- [x] PII: email, credit card (Luhn + card prefix), SSN (US, dashed), phone (international / North American / national) – values masked in messages; negative tests for dates, versions, "50 km", IPs, ISBN…
+- [x] Acronyms: first use must be "Full Name (ABC)" or "ABC (Full Name)"; skips headings, Roman numerals, ALL-CAPS markings
+- [x] Cross-references: Section / Figure / Table incl. outline numbers computed from heading levels, captions, lists and ranges
+- [x] 11 templates (6 in the sample set); `GET /api/rules/templates`, `POST /api/rules/samples` (idempotent, AI sample disabled)
+- [ ] Known limitations to review: part numbers like "0301-2345-678" read as phones; "API SDK" side by side skipped; "Chapter N" not checked
 
 ## ⬜ Integration (lead)
 - [ ] Review both branches, merge, run every gate together (server + client + Playwright)
