@@ -13,6 +13,7 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 ## 2026-09-29 – `feature/monochrome-ui` (follow-up)
 - Owner feedback: too bright; wants a small coloured dot per level and colour in the document highlights (ADR-017 amendment).
 - Grey app background and off-white panels. 6 px severity dots (red / orange / yellow) in labels, top-bar counts and the filter. Coloured highlight tints with the underline styles kept; the active highlight deepens its tint.
+- Spacing: the last sidebar panel grows (`lg:grow`), so both columns end on the same line; the Recent documents heading gap is 16 px like every other panel. All gaps measured at 16 px.
 - **Tests:** client 103 passed. The severity test now checks that colour appears only in dots and highlights, and that the active highlight differs from the normal one.
 
 ## 2026-09-29 – `feature/monochrome-ui`

@@ -27,8 +27,9 @@ export default function DocumentsPanel({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Last panel in the sidebar: lg:grow stretches it so both columns end on the same line (it never shrinks it)
   return (
-    <Panel className="flex flex-col gap-4 p-4" aria-labelledby="documents-heading">
+    <Panel className="flex flex-col gap-4 p-4 lg:grow" aria-labelledby="documents-heading">
       <PanelHeader id="documents-heading" title="Documents" count={documents.length}>
         <Button size="sm" icon="upload" onClick={() => inputRef.current?.click()} disabled={uploading}>
           {uploading ? "Uploading…" : "Upload .docx"}

@@ -73,7 +73,7 @@ export default function EmptyState({ documents, rulesEnabled, uploading, onUploa
 
       {documents.length > 0 && (
         <Panel className="p-4" aria-labelledby="recent-heading">
-          <h2 id="recent-heading" className="mb-3 text-base font-semibold tracking-tight text-zinc-900">
+          <h2 id="recent-heading" className="mb-4 text-base font-semibold tracking-tight text-zinc-900">
             Recent documents
           </h2>
           <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
