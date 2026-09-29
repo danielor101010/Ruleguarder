@@ -1,4 +1,14 @@
-import type { DocumentFull, DocumentSummary, Report, Rule, RuleInput, RuleType } from "./types";
+import type {
+  DocumentFull,
+  DocumentSummary,
+  Report,
+  Rule,
+  RuleCreate,
+  RuleTemplate,
+  RuleType,
+  RuleUpdate,
+  SampleRulesResult,
+} from "./types";
 
 const BASE = "/api";
 
@@ -41,12 +51,23 @@ const json = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+/**
+ * True when the server doesn't provide an endpoint at all (older server build).
+ * FastAPI answers 405 instead of 404 when the path matches another route's pattern
+ * (e.g. `GET /rules/templates` vs `PATCH /rules/{id}`), so both mean "not available".
+ */
+export function isMissingEndpoint(err: unknown): boolean {
+  return err instanceof ApiError && (err.status === 404 || err.status === 405);
+}
+
 export const api = {
   ruleTypes: () => request<RuleType[]>("/rules/types"),
   rules: () => request<Rule[]>("/rules"),
-  createRule: (rule: RuleInput) => request<Rule>("/rules", json("POST", rule)),
-  updateRule: (id: number, changes: Partial<RuleInput>) => request<Rule>(`/rules/${id}`, json("PATCH", changes)),
+  createRule: (rule: RuleCreate) => request<Rule>("/rules", json("POST", rule)),
+  updateRule: (id: number, changes: RuleUpdate) => request<Rule>(`/rules/${id}`, json("PATCH", changes)),
   deleteRule: (id: number) => requestNoContent(`/rules/${id}`, { method: "DELETE" }),
+  ruleTemplates: () => request<RuleTemplate[]>("/rules/templates"),
+  loadSampleRules: () => request<SampleRulesResult>("/rules/samples", { method: "POST" }),
 
   documents: () => request<DocumentSummary[]>("/documents"),
   document: (id: number) => request<DocumentFull>(`/documents/${id}`),

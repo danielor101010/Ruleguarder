@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError } from "./api";
+import { api, ApiError, isMissingEndpoint } from "./api";
 
 function mockFetch(status: number, body?: unknown, statusText = "") {
   const fn = vi.fn().mockResolvedValue(
@@ -49,6 +49,30 @@ describe("api", () => {
   it("handles 204 No Content on delete", async () => {
     mockFetch(204);
     await expect(api.deleteRule(3)).resolves.toBeUndefined();
+  });
+
+  it("fetches rule templates", async () => {
+    const fetch = mockFetch(200, []);
+    await expect(api.ruleTemplates()).resolves.toEqual([]);
+    expect(fetch).toHaveBeenCalledWith("/api/rules/templates", undefined);
+  });
+
+  it("loads the sample rules with a POST", async () => {
+    const fetch = mockFetch(201, { created: [], skipped: ["PII"] });
+    await expect(api.loadSampleRules()).resolves.toEqual({ created: [], skipped: ["PII"] });
+    const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/rules/samples");
+    expect(init.method).toBe("POST");
+  });
+
+  it("recognises a missing endpoint (404 or 405)", async () => {
+    mockFetch(404, { detail: "Not Found" });
+    expect(isMissingEndpoint(await api.ruleTemplates().catch((e: unknown) => e))).toBe(true);
+    mockFetch(405, { detail: "Method Not Allowed" });
+    expect(isMissingEndpoint(await api.ruleTemplates().catch((e: unknown) => e))).toBe(true);
+    mockFetch(500, { detail: "boom" });
+    expect(isMissingEndpoint(await api.ruleTemplates().catch((e: unknown) => e))).toBe(false);
+    expect(isMissingEndpoint(new TypeError("Failed to fetch"))).toBe(false);
   });
 
   it("propagates network failures", async () => {

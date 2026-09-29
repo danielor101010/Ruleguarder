@@ -51,6 +51,37 @@ export interface Rule {
 
 export type RuleInput = Omit<Rule, "id" | "created_at">;
 
+/** POST /api/rules body. Optional fields get server defaults (severity "high", enabled true). */
+export interface RuleCreate {
+  name: string;
+  description?: string;
+  type: string;
+  params: Record<string, unknown>;
+  severity?: Severity;
+  enabled?: boolean;
+}
+
+export type RuleUpdate = Partial<Pick<RuleCreate, "name" | "description" | "params" | "severity" | "enabled">>;
+
+export type RuleTemplateCategory = "security" | "privacy" | "style" | "structure" | "ai";
+
+export interface RuleTemplate {
+  /** Stable slug, e.g. "pii-all" */
+  id: string;
+  label: string;
+  description: string;
+  category: RuleTemplateCategory;
+  in_sample_set: boolean;
+  /** Ready to POST /api/rules; the UI lets the user edit it first. */
+  rule: RuleCreate;
+}
+
+/** POST /api/rules/samples response; `skipped` lists names that already existed. */
+export interface SampleRulesResult {
+  created: Rule[];
+  skipped: string[];
+}
+
 /** Subset of JSON Schema that pydantic produces for rule params. */
 export interface ParamSchema {
   type?: "string" | "integer" | "number" | "boolean" | "array";
