@@ -14,7 +14,7 @@ highlighted in the document, with paragraph / table cell and the nearest heading
 |---|---|---|
 | Server | Python 3.12, FastAPI | Best DOCX tooling is in Python; typed API with auto docs at `/docs` |
 | DOCX parsing | python-docx | Paragraphs, headings, tables, runs, fonts and sizes, all in document order |
-| LLM | Claude (`claude-opus-5-5`) via the Anthropic SDK, behind a provider interface | Understands rules written in natural language, in Hebrew too; the provider can be swapped for a self-hosted model |
+| LLM | Google Gemini (`gemini-3.8-flash` by default) via the `google-genai` SDK with native structured output, behind a provider interface | Understands rules written in natural language; the provider can be swapped (e.g. for a self-hosted model) |
 | DB | PostgreSQL 16 + SQLAlchemy 2 | Rules, documents (parsed structure), stored check reports |
 | Client | React 18 + TypeScript + Vite | Document viewer with highlights; RTL handled with `dir="auto"` |
 | Infra | Docker Compose: `db`, `server`, `client` (nginx) | nginx serves the built client and proxies `/api`, so the app has one origin |
@@ -54,7 +54,7 @@ new rule type needs no client changes.
 ## Running
 
 ```bash
-cp .env.example .env          # then set ANTHROPIC_API_KEY and POSTGRES_PASSWORD
+cp .env.example .env          # then set GEMINI_API_KEY and POSTGRES_PASSWORD
 
 # production-like
 docker compose up --build     # app: http://localhost:8080   API docs: http://localhost:8000/docs
@@ -83,7 +83,7 @@ server/app/
   config.py            settings from env
   models.py            Rule, Document, CheckRun
   docx_parser.py       .docx -> blocks with positions and formatting
-  llm/                 provider interface + Claude implementation
+  llm/                 provider interface + Gemini implementation
   rules/registry.py    rule types (params schema + checker)
   rules/llm_check.py   chunking, LLM calls, quote -> offsets
   rules/engine.py      runs all rules, builds violations

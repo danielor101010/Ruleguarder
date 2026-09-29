@@ -9,13 +9,14 @@ __all__ = ["LlmBlock", "LlmError", "LlmProvider", "LlmRule", "LlmViolation", "ge
 @lru_cache
 def get_llm_provider() -> LlmProvider:
     settings = get_settings()
-    if settings.llm_provider == "anthropic":
-        from .anthropic_provider import AnthropicProvider
+    if settings.llm_provider == "gemini":
+        from .gemini_provider import GeminiProvider
 
-        return AnthropicProvider(
-            api_key=settings.anthropic_api_key,
+        return GeminiProvider(
+            api_key=settings.gemini_api_key,
             model=settings.llm_model,
-            effort=settings.llm_effort,
-            max_tokens=settings.llm_max_tokens,
+            max_output_tokens=settings.llm_max_tokens,
+            temperature=settings.llm_temperature,
+            max_retries=settings.llm_max_retries,
         )
     raise LlmError(f"Unknown LLM_PROVIDER '{settings.llm_provider}'")

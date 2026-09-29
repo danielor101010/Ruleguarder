@@ -15,14 +15,18 @@ class Settings(BaseSettings):
     log_level: str = "info"
 
     # LLM
-    llm_provider: str = "anthropic"
-    anthropic_api_key: str | None = None
-    llm_model: str = "claude-opus-5-5"
-    llm_effort: str = "high"  # low | medium | high | xhigh | max
+    llm_provider: str = "gemini"
+    gemini_api_key: str | None = None
+    llm_model: str = "gemini-3.8-flash"
     llm_max_tokens: int = 32000
+    # None => the model's default temperature
+    llm_temperature: float | None = None
+    # Retries on rate limit (429) / server errors, with exponential backoff
+    llm_max_retries: int = 4
     # Documents longer than this are split into several LLM calls
     llm_chunk_chars: int = 60000
-    llm_max_parallel: int = 4
+    # Keep low on the free tier: parallel calls count against the per-minute quota
+    llm_max_parallel: int = 2
 
     @property
     def cors_origin_list(self) -> list[str]:
