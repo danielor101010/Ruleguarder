@@ -8,11 +8,11 @@ import type { Severity } from "../types";
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "danger-solid";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-indigo-500 text-white shadow-md shadow-indigo-950/40 hover:bg-indigo-400 active:bg-indigo-600",
-  secondary: "border border-slate-600 bg-slate-800 text-slate-100 hover:border-slate-500 hover:bg-slate-700",
-  ghost: "text-slate-300 hover:bg-slate-800 hover:text-white",
-  danger: "border border-red-500/40 text-red-300 hover:bg-red-500/15 hover:text-red-200",
-  "danger-solid": "bg-red-600 text-white hover:bg-red-500",
+  primary: "bg-zinc-900 text-white hover:bg-zinc-700 active:bg-black",
+  secondary: "border border-zinc-300 bg-white text-zinc-900 hover:border-zinc-400 hover:bg-zinc-100",
+  ghost: "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+  danger: "border border-zinc-300 bg-white text-zinc-900 hover:border-zinc-900",
+  "danger-solid": "bg-zinc-900 text-white hover:bg-black",
 };
 
 export function Button({
@@ -45,13 +45,11 @@ export function Button({
 export function IconButton({
   icon,
   label,
-  tone = "default",
   className,
   ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   icon: IconName;
   label: string;
-  tone?: "default" | "danger";
 }) {
   return (
     <button
@@ -59,10 +57,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cx(
-        "inline-flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-50",
-        tone === "danger"
-          ? "text-slate-400 hover:bg-red-500/15 hover:text-red-300"
-          : "text-slate-400 hover:bg-slate-700 hover:text-white",
+        "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50",
         className,
       )}
       {...props}
@@ -80,7 +75,7 @@ export function DeleteButton({ name, onConfirm, compact = false }: { name: strin
   const [asking, setAsking] = useState(false);
   if (!asking) {
     return compact ? (
-      <IconButton icon="trash" tone="danger" label={`Delete ${name}`} onClick={() => setAsking(true)} />
+      <IconButton icon="trash" label={`Delete ${name}`} onClick={() => setAsking(true)} />
     ) : (
       <Button variant="danger" icon="trash" onClick={() => setAsking(true)} aria-label={`Delete ${name}`}>
         Delete
@@ -101,7 +96,7 @@ export function DeleteButton({ name, onConfirm, compact = false }: { name: strin
 
 /* ------------------------------------------------------------------ surfaces */
 
-/** Opaque dark card: the main surface of the dashboard. */
+/** White card: the main surface of the dashboard. */
 export function Panel({
   as: Tag = "section",
   className,
@@ -116,7 +111,7 @@ export function Panel({
 }) {
   return (
     <Tag
-      className={cx("rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-lg shadow-black/20", className)}
+      className={cx("rounded-3xl border border-zinc-200 bg-white text-zinc-900 shadow-sm", className)}
       {...rest}
     >
       {children}
@@ -137,11 +132,9 @@ export function PanelHeader({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <h2 id={id} className="flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-200 uppercase">
+      <h2 id={id} className="flex items-baseline gap-2 text-base font-semibold tracking-tight text-zinc-900">
         {title}
-        {count !== undefined && (
-          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-300 tabular-nums">{count}</span>
-        )}
+        {count !== undefined && <span className="text-sm font-normal text-zinc-400 tabular-nums">{count}</span>}
       </h2>
       {children}
     </div>
@@ -218,28 +211,28 @@ export function Modal({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">
-      <div aria-hidden="true" className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm" onClick={onClose} />
+      <div aria-hidden="true" className="absolute inset-0 bg-zinc-900/40 backdrop-blur-sm" onClick={onClose} />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className={cx(
-          "relative flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl sm:rounded-2xl",
+          "relative flex max-h-[92vh] w-full flex-col rounded-t-3xl border border-zinc-200 bg-white text-zinc-900 shadow-2xl sm:rounded-3xl",
           size === "lg" ? "sm:max-w-3xl" : "sm:max-w-xl",
         )}
       >
-        <div className="flex items-start gap-3 border-b border-slate-800 px-6 py-4">
+        <div className="flex items-start gap-3 border-b border-zinc-200 px-6 py-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-semibold text-white" dir="auto">
+            <h2 id={titleId} className="text-lg font-semibold text-zinc-900" dir="auto">
               {title}
             </h2>
-            {subtitle && <div className="mt-0.5 text-sm text-slate-400">{subtitle}</div>}
+            {subtitle && <div className="mt-0.5 text-sm text-zinc-500">{subtitle}</div>}
           </div>
           <IconButton icon="x" label="Close" onClick={onClose} />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
-        {footer && <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 px-6 py-4">{footer}</div>}
+        {footer && <div className="flex flex-wrap items-center gap-2 border-t border-zinc-200 px-6 py-4">{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -274,7 +267,7 @@ export function Switch({
       className={cx(
         "relative inline-flex shrink-0 items-center rounded-full transition-colors",
         size === "sm" ? "h-5 w-9" : "h-6 w-11",
-        checked ? "bg-emerald-500 hover:bg-emerald-400" : "bg-slate-600 hover:bg-slate-500",
+        checked ? "bg-zinc-900 hover:bg-zinc-700" : "bg-zinc-300 hover:bg-zinc-400",
       )}
     >
       <span
@@ -290,53 +283,72 @@ export function Switch({
 }
 
 export const inputClass =
-  "w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 hover:border-slate-600 focus:border-indigo-400 disabled:opacity-60";
+  "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 hover:border-zinc-400 focus:border-zinc-900 disabled:bg-zinc-50 disabled:opacity-60";
 
-/* ------------------------------------------------------------------ badges & notes */
+/* ------------------------------------------------------------------ labels & notes */
 
-export function SeverityDot({ severity }: { severity: Severity }) {
-  return <span aria-hidden="true" className={cx("inline-block size-2.5 shrink-0 rounded-full", SEVERITY_CLASSES[severity].dot)} />;
-}
-
-/** Plain severity label: coloured dot + text, no chip. */
+/** Plain severity label: uppercase text whose weight and shade follow the severity. No dot, no chip. */
 export function SeverityBadge({ severity }: { severity: Severity }) {
   return (
-    <span className={cx("inline-flex items-center gap-1.5 text-xs font-semibold", SEVERITY_CLASSES[severity].text)}>
-      <SeverityDot severity={severity} />
+    <span className={cx("text-[0.7rem] tracking-wider uppercase", SEVERITY_CLASSES[severity].text)}>
       {SEVERITY_LABEL[severity]}
     </span>
   );
 }
 
-/** Marks rules that run through the LLM and therefore spend AI quota. Plain text, no chip. */
+/** Marks rules that run through the LLM and therefore spend AI quota. Plain text. */
 export function AiQuotaBadge() {
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-violet-300"
+      className="shrink-0 text-xs font-medium text-zinc-500"
       title="Checked by the AI model: every check with this rule enabled uses AI quota"
     >
-      <Icon name="sparkles" className="size-3.5" />
       Uses AI quota
     </span>
   );
 }
 
+/** Neutral inline message box; `strong` gives errors a darker border than notices. */
+function Note({ role, strong, children }: { role: "alert" | "status"; strong: boolean; children: ReactNode }) {
+  return (
+    <div
+      role={role}
+      className={cx(
+        "flex items-start gap-2 rounded-2xl border bg-zinc-50 px-3 py-2 text-sm text-zinc-800",
+        strong ? "border-zinc-900" : "border-zinc-300",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function ErrorNote({ children, onDismiss }: { children: ReactNode; onDismiss?: () => void }) {
   return (
-    <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-500/30">
-      <Icon name="alert" className="mt-0.5 size-4 shrink-0 text-red-300" />
+    <Note role="alert" strong>
+      <Icon name="alert" className="mt-0.5 size-4 shrink-0 text-zinc-900" />
       <div className="min-w-0 flex-1 break-words">{children}</div>
       {onDismiss && <IconButton icon="x" label="Dismiss" onClick={onDismiss} className="-my-1 size-6" />}
-    </div>
+    </Note>
   );
 }
 
 export function WarningNote({ children }: { children: ReactNode }) {
   return (
-    <div role="status" className="flex items-start gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-100 ring-1 ring-amber-400/30">
-      <Icon name="alert" className="mt-0.5 size-4 shrink-0 text-amber-300" />
+    <Note role="status" strong={false}>
+      <Icon name="alert" className="mt-0.5 size-4 shrink-0 text-zinc-700" />
       <div className="min-w-0 flex-1 break-words">{children}</div>
-    </div>
+    </Note>
+  );
+}
+
+/** Neutral dismissible status line, e.g. the result of loading sample rules. */
+export function StatusNote({ children, onDismiss }: { children: ReactNode; onDismiss?: () => void }) {
+  return (
+    <p role="status" className="flex items-center justify-between gap-2 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-800">
+      <span className="min-w-0 flex-1 break-words">{children}</span>
+      {onDismiss && <IconButton icon="x" label="Dismiss" onClick={onDismiss} className="-my-1 size-6" />}
+    </p>
   );
 }
 
@@ -351,7 +363,6 @@ const ICON_PATHS = {
   document: "M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm7 0v5h5M9 13h6M9 17h6",
   shield: "M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6l-8-3Zm-3 9 2 2 4-4",
   chevron: "m9 6 6 6-6 6",
-  sparkles: "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3ZM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z",
   template: "M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v4H4V5Zm0 8h7v7H5a1 1 0 0 1-1-1v-6Zm11 0h5v6a1 1 0 0 1-1 1h-4v-7Z",
   download: "M12 4v12m0 0-4-4m4 4 4-4M4 20h16",
   alert: "M12 8v5m0 3h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",

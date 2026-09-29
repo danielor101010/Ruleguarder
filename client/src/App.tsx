@@ -34,7 +34,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden bg-slate-950 lg:h-screen">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-zinc-100 lg:h-screen">
       <TopBar documentName={report.document?.filename ?? null} counts={counts} />
       <div className="grid flex-1 grid-cols-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[23rem_minmax(0,1fr)]">
         {/* On small screens the main area (upload / report) comes first */}
@@ -85,7 +85,7 @@ export default function App() {
           ) : (
             report.loading ? (
               <Panel className="flex flex-1 items-center justify-center p-8">
-                <p role="status" className="text-sm text-slate-400">
+                <p role="status" className="text-sm text-zinc-500">
                   Loading document…
                 </p>
               </Panel>

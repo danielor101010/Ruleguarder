@@ -92,12 +92,12 @@ export default function RuleForm({ types, rule, initial, source, onCreate, onUpd
         </select>
       </Field>
       {type ? (
-        <p className="-mt-2 text-xs text-slate-400">{type.description}</p>
+        <p className="-mt-2 text-xs text-zinc-500">{type.description}</p>
       ) : (
         typeKey && <ErrorNote>This server does not support the rule type “{typeKey}”.</ErrorNote>
       )}
       {isAi && (
-        <p className="flex items-center gap-2 rounded-xl bg-violet-500/10 px-3 py-2 text-xs text-violet-200 ring-1 ring-violet-400/30">
+        <p className="flex items-baseline gap-2 rounded-2xl bg-zinc-100 px-3 py-2 text-xs text-zinc-600">
           <AiQuotaBadge /> Checked by the AI model; every check spends quota.
         </p>
       )}
@@ -129,10 +129,10 @@ export default function RuleForm({ types, rule, initial, source, onCreate, onUpd
         <input className={inputClass} dir="auto" value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
 
-      <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+      <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900">
         <span>
           Enabled
-          <span className="block text-xs text-slate-400">Disabled rules are skipped when checking documents.</span>
+          <span className="block text-xs text-zinc-500">Disabled rules are skipped when checking documents.</span>
         </span>
         <Switch checked={enabled} onChange={setEnabled} label="Enabled" />
       </div>
@@ -145,10 +145,10 @@ export default function RuleForm({ types, rule, initial, source, onCreate, onUpd
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-200">
+    <label className="flex flex-col gap-1.5 text-sm font-medium text-zinc-800">
       {label}
       {children}
-      {hint && <span className="text-xs font-normal text-slate-400">{hint}</span>}
+      {hint && <span className="text-xs font-normal text-zinc-500">{hint}</span>}
     </label>
   );
 }
@@ -170,7 +170,7 @@ function ParamField({
 
   if (schema.type === "boolean") {
     return (
-      <div className="flex items-center justify-between gap-3 text-sm text-slate-200">
+      <div className="flex items-center justify-between gap-3 text-sm text-zinc-800">
         {label}
         <Switch checked={Boolean(value)} onChange={onChange} label={label} size="sm" />
       </div>

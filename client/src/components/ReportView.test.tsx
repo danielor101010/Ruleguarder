@@ -47,7 +47,8 @@ describe("ReportView", () => {
     const mark = screen.getByText("50 km");
     expect(mark.tagName).toBe("MARK");
     expect(mark).toHaveAttribute("data-severity", "high");
-    expect(mark).toHaveClass("bg-red-200/90");
+    // Monochrome: severity shows as shade + underline style, not hue (ADR-017)
+    expect(mark).toHaveClass("bg-zinc-300", "decoration-solid");
     expect(mark).toHaveAttribute("title", "No figures: Reveals range");
   });
 
@@ -123,6 +124,14 @@ describe("ReportView", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "nearest" });
   });
 
+  it("inverts the active highlight to black instead of its severity shade", async () => {
+    setup();
+    const mark = screen.getByText("50 km");
+    await userEvent.click(mark);
+    expect(mark).toHaveClass("bg-zinc-900", "text-white");
+    expect(mark).not.toHaveClass("bg-zinc-300");
+  });
+
   it("highlights are keyboard accessible", async () => {
     setup();
     screen.getByText("50 km").focus();
@@ -183,7 +192,7 @@ describe("ReportView", () => {
 
   it("does not claim a clean document when rules could not be checked", () => {
     setup([], 0, [{ rule_id: 4, rule_name: "AI rule", error: "quota" }]);
-    expect(screen.queryByText(/No violations found ✓/)).toBeNull();
+    expect(screen.queryByText("No violations found.")).toBeNull();
     expect(screen.getByText("No violations found by the rules that ran.")).toBeInTheDocument();
   });
 

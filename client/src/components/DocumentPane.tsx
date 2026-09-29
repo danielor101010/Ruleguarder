@@ -15,7 +15,7 @@ interface CommonProps {
 
 /** The document as paragraphs, headings and tables, with severity highlights. */
 export default function DocumentPane({ blocks, ...props }: CommonProps & { blocks: Block[] }) {
-  if (!blocks.length) return <p className="text-sm text-slate-500">This document has no text.</p>;
+  if (!blocks.length) return <p className="text-sm text-zinc-500">This document has no text.</p>;
   return (
     <div className="flex flex-col gap-2">
       {layoutBlocks(blocks).map((item) =>
@@ -28,7 +28,7 @@ export default function DocumentPane({ blocks, ...props }: CommonProps & { block
                 {item.cells.map((row, r) => (
                   <tr key={r}>
                     {row.map((cellBlocks, c) => (
-                      <td key={c} className="border border-slate-200 p-1.5 align-top">
+                      <td key={c} className="border border-zinc-300 p-1.5 align-top">
                         {cellBlocks.map((b) => (
                           <BlockView key={b.id} block={b} {...props} />
                         ))}
@@ -58,12 +58,12 @@ function headingTag(block: Block): BlockTag {
 }
 
 function headingClass(block: Block): string {
-  if (block.kind !== "heading") return "text-[0.95rem] leading-relaxed text-slate-800";
+  if (block.kind !== "heading") return "text-[0.95rem] leading-relaxed text-zinc-800";
   const level = block.heading_level ?? 1;
-  if (level === 0) return "text-2xl font-bold text-slate-950";
-  if (level === 1) return "mt-3 text-xl font-semibold text-slate-950";
-  if (level === 2) return "mt-2 text-lg font-semibold text-slate-900";
-  return "mt-1 text-base font-semibold text-slate-900";
+  if (level === 0) return "text-2xl font-bold text-zinc-950";
+  if (level === 1) return "mt-3 text-xl font-semibold text-zinc-950";
+  if (level === 2) return "mt-2 text-lg font-semibold text-zinc-900";
+  return "mt-1 text-base font-semibold text-zinc-900";
 }
 
 /** Enter / Space activate a focusable non-button element. */
@@ -100,9 +100,8 @@ function BlockView({ block, byBlock, activeId, flash, onPick, registerBlock }: C
             role="button"
             tabIndex={0}
             className={cx(
-              "rounded-sm px-0.5 text-slate-950 underline decoration-2 underline-offset-4 transition-colors",
-              SEVERITY_CLASSES[severity].mark,
-              segActive && "decoration-[3px] brightness-95 saturate-150",
+              "rounded-sm px-0.5 underline decoration-2 underline-offset-4 transition-colors",
+              segActive ? "bg-zinc-900 text-white decoration-white" : cx("text-zinc-950", SEVERITY_CLASSES[severity].mark),
             )}
             title={tooltip(seg.violations)}
             onClick={(e) => {
@@ -134,7 +133,7 @@ function BlockView({ block, byBlock, activeId, flash, onPick, registerBlock }: C
         "relative scroll-my-24 rounded-md px-3 py-1 transition-colors",
         headingClass(block),
         blockSeverity && SEVERITY_CLASSES[blockSeverity].block,
-        active && !blockSeverity && "bg-indigo-50",
+        active && !blockSeverity && "bg-zinc-100",
       ),
       onClick: flagged ? pickBlock : undefined,
       onKeyDown: flagged ? onActivate(pickBlock) : undefined,
@@ -146,7 +145,7 @@ function BlockView({ block, byBlock, activeId, flash, onPick, registerBlock }: C
         key={flash.nonce}
         aria-hidden="true"
         data-testid="flash-overlay"
-        className="pointer-events-none absolute inset-0 animate-flash rounded-md motion-reduce:animate-none motion-reduce:bg-indigo-200/40"
+        className="pointer-events-none absolute inset-0 animate-flash rounded-md motion-reduce:animate-none motion-reduce:bg-zinc-200/60"
       />
     ),
   );

@@ -43,7 +43,7 @@ export default function RuleDetails({ rule, type, onClose, onEdit, onToggle, onD
           <SeverityBadge severity={rule.severity} />
           {isAi && <AiQuotaBadge />}
           <span className="flex-1" />
-          <span className="flex items-center gap-2 text-sm text-slate-300">
+          <span className="flex items-center gap-2 text-sm text-zinc-600">
             {rule.enabled ? "Enabled" : "Disabled"}
             <Switch checked={rule.enabled} onChange={onToggle} label={`Enable ${rule.name}`} />
           </span>
@@ -51,9 +51,9 @@ export default function RuleDetails({ rule, type, onClose, onEdit, onToggle, onD
 
         {instruction !== null && (
           <section>
-            <h3 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Rule</h3>
+            <h3 className="mb-2 text-xs font-semibold tracking-wider text-zinc-500 uppercase">Rule</h3>
             <blockquote
-              className="rounded-xl border-l-4 border-indigo-400 bg-slate-950 px-4 py-3 text-[0.95rem] leading-relaxed whitespace-pre-wrap text-slate-100"
+              className="rounded-2xl bg-zinc-100 px-4 py-3 text-[0.95rem] leading-relaxed whitespace-pre-wrap text-zinc-900"
               dir="auto"
             >
               {instruction}
@@ -63,12 +63,12 @@ export default function RuleDetails({ rule, type, onClose, onEdit, onToggle, onD
 
         {params.length > 0 && (
           <section>
-            <h3 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Settings</h3>
-            <dl className="divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-950">
+            <h3 className="mb-2 text-xs font-semibold tracking-wider text-zinc-500 uppercase">Settings</h3>
+            <dl className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 bg-white">
               {params.map(([key, value]) => (
                 <div key={key} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 px-4 py-2.5 text-sm">
-                  <dt className="text-slate-400">{type?.params_schema.properties[key]?.title ?? key}</dt>
-                  <dd className="font-medium break-words text-slate-100" dir="auto">
+                  <dt className="text-zinc-500">{type?.params_schema.properties[key]?.title ?? key}</dt>
+                  <dd className="font-medium break-words text-zinc-900" dir="auto">
                     {formatValue(value)}
                   </dd>
                 </div>
@@ -79,21 +79,21 @@ export default function RuleDetails({ rule, type, onClose, onEdit, onToggle, onD
 
         {rule.description && (
           <section>
-            <h3 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Description</h3>
-            <p className="text-sm text-slate-200" dir="auto">
+            <h3 className="mb-2 text-xs font-semibold tracking-wider text-zinc-500 uppercase">Description</h3>
+            <p className="text-sm text-zinc-700" dir="auto">
               {rule.description}
             </p>
           </section>
         )}
 
         {type?.description && (
-          <p className="rounded-xl bg-slate-800/60 px-4 py-3 text-sm text-slate-300">
-            <span className="font-semibold text-slate-200">How this rule type works: </span>
+          <p className="rounded-2xl bg-zinc-100 px-4 py-3 text-sm text-zinc-600">
+            <span className="font-semibold text-zinc-900">How this rule type works: </span>
             {type.description}
           </p>
         )}
 
-        <p className="text-xs text-slate-500">Created {new Date(rule.created_at).toLocaleString()}</p>
+        <p className="text-xs text-zinc-400">Created {new Date(rule.created_at).toLocaleString()}</p>
       </div>
     </Modal>
   );

@@ -6,7 +6,7 @@ import type { Rule, RuleCreate, RuleTemplate, RuleType, RuleUpdate } from "../ty
 import RuleDetails from "./RuleDetails";
 import RuleForm from "./RuleForm";
 import TemplatePicker from "./TemplatePicker";
-import { AiQuotaBadge, Button, ErrorNote, Icon, IconButton, Panel, PanelHeader, SeverityDot, Switch } from "./ui";
+import { AiQuotaBadge, Button, ErrorNote, Icon, Panel, PanelHeader, SeverityBadge, StatusNote, Switch } from "./ui";
 
 export interface TemplatesView {
   templates: RuleTemplate[];
@@ -91,27 +91,24 @@ export default function RulesPanel({
         )}
       </div>
       {!templatesAvailable && (
-        <p className="text-xs text-slate-400">Rule templates and sample rules are not available on this server.</p>
+        <p className="text-xs text-zinc-500">Rule templates and sample rules are not available on this server.</p>
       )}
       {samples.message && (
-        <p role="status" className="flex items-center justify-between gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 ring-1 ring-emerald-500/30">
-          Sample rules: {samples.message}
-          <IconButton icon="x" label="Dismiss" onClick={samples.onDismiss} className="-my-1 size-6" />
-        </p>
+        <StatusNote onDismiss={samples.onDismiss}>Sample rules: {samples.message}</StatusNote>
       )}
       {samples.error && <ErrorNote onDismiss={samples.onDismiss}>{samples.error}</ErrorNote>}
       {error && <ErrorNote onDismiss={onDismissError}>{error}</ErrorNote>}
 
-      {loading && <p className="text-sm text-slate-400">Loading rules…</p>}
+      {loading && <p className="text-sm text-zinc-500">Loading rules…</p>}
       {!loading && !rules.length && (
-        <div className="rounded-xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
+        <div className="rounded-2xl border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500">
           No rules yet.
           <br />
           Create one, pick a template, or load the sample rules.
         </div>
       )}
       {rules.length > 0 && (
-        <p className="-mb-2 text-xs text-slate-400">
+        <p className="-mb-2 text-xs text-zinc-500">
           {enabledCount} of {rules.length} enabled · click a rule to see it
         </p>
       )}
@@ -123,34 +120,30 @@ export default function RulesPanel({
             <li
               key={rule.id}
               className={cx(
-                "group flex items-center gap-3 rounded-xl border bg-slate-800/50 pr-3 transition-colors hover:border-slate-500 hover:bg-slate-800",
-                rule.enabled ? "border-slate-700" : "border-slate-800 opacity-70",
+                "group flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white pr-3 transition-colors hover:border-zinc-400",
+                !rule.enabled && "opacity-60",
               )}
             >
               <button
                 type="button"
                 aria-haspopup="dialog"
                 aria-label={`Open rule ${rule.name}`}
-                className="flex min-w-0 flex-1 flex-col gap-1 rounded-xl py-3 pl-3 text-left"
+                className="flex min-w-0 flex-1 flex-col gap-1 rounded-2xl py-3 pl-4 text-left"
                 onClick={() => setViewingId(rule.id)}
               >
-                <span className="flex items-center gap-2">
-                  <SeverityDot severity={rule.severity} />
-                  <span className="truncate text-sm font-semibold text-white" dir="auto" title={rule.name}>
-                    {rule.name}
-                  </span>
+                <span className="truncate text-sm font-semibold text-zinc-900" dir="auto" title={rule.name}>
+                  {rule.name}
                 </span>
-                <span className="line-clamp-2 text-xs text-slate-400" dir="auto">
+                <span className="line-clamp-2 text-xs text-zinc-500" dir="auto">
                   {instruction ?? typeOf(rule.type)?.label ?? rule.type}
                 </span>
-                {ai && (
-                  <span className="mt-0.5">
-                    <AiQuotaBadge />
-                  </span>
-                )}
+                <span className="mt-0.5 flex flex-wrap items-baseline gap-x-3">
+                  <SeverityBadge severity={rule.severity} />
+                  {ai && <AiQuotaBadge />}
+                </span>
               </button>
               <Switch checked={rule.enabled} onChange={() => onToggle(rule)} label={`Enable ${rule.name}`} size="sm" />
-              <Icon name="chevron" className="size-4 shrink-0 text-slate-500 group-hover:text-slate-300" />
+              <Icon name="chevron" className="size-4 shrink-0 text-zinc-400 group-hover:text-zinc-900" />
             </li>
           );
         })}
