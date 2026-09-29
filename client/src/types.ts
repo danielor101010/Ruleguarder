@@ -12,6 +12,9 @@ export interface Run {
   italic: boolean | null;
 }
 
+/** Where a block is in the document; "textbox" blocks follow the paragraph that holds them. */
+export type BlockPart = "body" | "header" | "footer" | "footnote" | "endnote" | "textbox";
+
 export interface Block {
   id: number;
   kind: "paragraph" | "heading" | "table_cell";
@@ -25,6 +28,8 @@ export interface Block {
   row: number | null;
   col: number | null;
   runs: Run[];
+  /** Missing on documents parsed before parts existed: treat as "body". */
+  part?: BlockPart;
 }
 
 export interface DocumentSummary {

@@ -10,6 +10,15 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `feature/parser-coverage` (M4, lead)
+- The parser reads headers/footers (all variants, linked ones once), footnotes, endnotes, text boxes (once, not the VML copy), nested tables, hyperlink text and field results (ADR-019).
+- The document view shows the page regions (Header, Footer, Footnotes, Endnotes) and framed text boxes.
+- **Tests:**
+  - server 223 passed (+9: a fixture .docx with every part; labels, order, offsets, linked-header dedup, text box once, a rule finding violations in header / footnote / endnote / text box / nested table, SEQ caption counted as a figure, old documents still load)
+  - client 107 passed (+2: region split; highlight and click-to-locate inside a footnote)
+  - Playwright 5 passed / 1 skipped
+- Not added: a Playwright test that uploads a document with headers and footnotes (covered by the server fixture + component test).
+
 ## 2026-09-29 – `feature/background-checks` (M3, lead)
 - Background checks with progress and cancel (ADR-018): 4 new endpoints, `CheckRunner`, progress columns and startup migration, restart recovery.
 - **Bug found by tests and fixed:** after a cancel, queued AI requests still started (3 calls instead of 1); requests are now submitted lazily.

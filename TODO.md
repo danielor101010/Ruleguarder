@@ -130,14 +130,14 @@ Long documents keep the page waiting today (one blocking request).
 - [x] Only one running check per document at a time
 - **Done when:** unit tests cover the state transitions, E2E covers progress → result (non-AI rules, with a slow fake), and the API contract + ADR are updated
 
-## M4 – Read more of the document — `feature/parser-coverage`
+## M4 – Read more of the document — `feature/parser-coverage` — ✅ done
 Parts of a .docx are currently ignored, so violations there are never found.
-- [ ] Headers and footers (per section, deduplicated), labelled e.g. "Header (section 1)"
-- [ ] Footnotes and endnotes, labelled "Footnote 3"
-- [ ] Text boxes and shapes
-- [ ] Tables nested inside tables
-- [ ] Hyperlink text and field results (e.g. SEQ caption numbers), which fixes the cross-reference caption limitation
-- [ ] The document view shows these parts in their own sections so highlights still point at the right place
+- [x] Headers and footers (per section, deduplicated), labelled e.g. "Header (section 1)"
+- [x] Footnotes and endnotes, labelled "Footnote 3"
+- [x] Text boxes and shapes
+- [x] Tables nested inside tables
+- [x] Hyperlink text and field results (e.g. SEQ caption numbers), which fixes the cross-reference caption limitation
+- [x] The document view shows these parts in their own sections so highlights still point at the right place
 - **Done when:** a fixture .docx containing every part type is parsed with correct labels and offsets, rules find violations in each part, and the E2E click-to-locate works for a header and a footnote
 
 ## Low priority

@@ -13,6 +13,8 @@ def _upgrade_severity(value: Any) -> Any:
 
 Severity = Annotated[Literal["low", "medium", "high"], BeforeValidator(_upgrade_severity)]
 BlockKind = Literal["paragraph", "heading", "table_cell"]
+# Where in the document a block is; "textbox" blocks follow the paragraph that holds them
+BlockPart = Literal["body", "header", "footer", "footnote", "endnote", "textbox"]
 
 
 # ---------- Parsed document ----------
@@ -31,7 +33,7 @@ class Run(BaseModel):
 
 
 class Block(BaseModel):
-    """One paragraph of the document (body paragraph, heading, or a paragraph inside a table cell)."""
+    """One paragraph of the document: body paragraph, heading, table cell, text box, header/footer or note."""
 
     id: int
     kind: BlockKind
@@ -45,6 +47,7 @@ class Block(BaseModel):
     row: int | None = None
     col: int | None = None
     runs: list[Run] = []
+    part: BlockPart = "body"  # documents parsed before this field existed are all body
 
 
 # ---------- Rules ----------

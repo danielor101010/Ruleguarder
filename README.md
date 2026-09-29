@@ -11,6 +11,7 @@ highlighted in the document and listed with its location: paragraph or table cel
 
 - **AI rules** in any language, checked by Google Gemini with structured output
 - **Built-in checks:** forbidden or required text (plain or regex), sentence and paragraph length, allowed fonts, font size range, personal data (email, phone, SSN, credit card), undefined acronyms, broken section/figure/table references
+- **Whole document:** body, tables (including nested ones), text boxes, headers, footers, footnotes and endnotes
 - **Exact locations:** the AI quotes the offending text and the server locates it character by character, so a highlight never points at the wrong text
 - **Rule templates** and a one-click sample rule set
 - **Background checks** with a progress bar; a check can be cancelled, and a reloaded page reconnects to it

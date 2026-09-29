@@ -1,7 +1,7 @@
 import { createElement, type KeyboardEvent } from "react";
 import type { Flash } from "../hooks/useViolationFocus";
 import { hasSpan, segmentText, worstSeverity } from "../lib/highlight";
-import { layoutBlocks } from "../lib/layout";
+import { layoutBlocks, splitParts } from "../lib/layout";
 import { cx, SEVERITY_CLASSES } from "../lib/severity";
 import type { Block, Violation } from "../types";
 
@@ -16,33 +16,65 @@ interface CommonProps {
 /** The document as paragraphs, headings and tables, with severity highlights. */
 export default function DocumentPane({ blocks, ...props }: CommonProps & { blocks: Block[] }) {
   if (!blocks.length) return <p className="text-sm text-slate-500">This document has no text.</p>;
+  const parts = splitParts(blocks);
   return (
-    <div className="flex flex-col gap-2">
-      {layoutBlocks(blocks).map((item) =>
-        item.kind === "block" ? (
-          <BlockView key={item.block.id} block={item.block} {...props} />
-        ) : (
-          <div key={`t${item.tableIndex}`} className="my-2 overflow-x-auto">
-            <table dir="auto" className="w-full border-collapse text-sm">
-              <tbody>
-                {item.cells.map((row, r) => (
-                  <tr key={r}>
-                    {row.map((cellBlocks, c) => (
-                      <td key={c} className="border border-slate-200 p-1.5 align-top">
-                        {cellBlocks.map((b) => (
-                          <BlockView key={b.id} block={b} {...props} />
-                        ))}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ),
-      )}
+    <div className="flex flex-col gap-6">
+      <Region title="Header" blocks={parts.headers} {...props} />
+      <div className="flex flex-col gap-2">
+        {layoutBlocks(parts.body).map((item) =>
+          item.kind === "block" ? (
+            <BlockView key={item.block.id} block={item.block} {...props} />
+          ) : (
+            <div key={`t${item.tableIndex}`} className="my-2 overflow-x-auto">
+              <table dir="auto" className="w-full border-collapse text-sm">
+                <tbody>
+                  {item.cells.map((row, r) => (
+                    <tr key={r}>
+                      {row.map((cellBlocks, c) => (
+                        <td key={c} className="border border-slate-200 p-1.5 align-top">
+                          {cellBlocks.map((b) => (
+                            <BlockView key={b.id} block={b} {...props} />
+                          ))}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ),
+        )}
+      </div>
+      <Region title="Footer" blocks={parts.footers} {...props} />
+      <Region title="Footnotes" blocks={parts.footnotes} {...props} />
+      <Region title="Endnotes" blocks={parts.endnotes} {...props} />
     </div>
   );
+}
+
+/** A labelled page region (header, footer, notes); hidden when the document has none. */
+function Region({ title, blocks, ...props }: CommonProps & { title: string; blocks: Block[] }) {
+  if (!blocks.length) return null;
+  return (
+    <section aria-label={title} className="flex flex-col gap-1 border-t border-dashed border-slate-300 pt-3 first:border-t-0 first:border-b first:pt-0 first:pb-3">
+      <h3 className="px-3 text-[0.7rem] font-semibold tracking-wider text-slate-500 uppercase">{title}</h3>
+      {blocks.map((b) => (
+        <div key={b.id} className="flex gap-2 text-sm">
+          {b.part !== "header" && b.part !== "footer" && (
+            <span className="shrink-0 pt-1 pl-3 text-xs text-slate-400 tabular-nums">{noteNumber(b)}</span>
+          )}
+          <div className="min-w-0 flex-1">
+            <BlockView block={b} {...props} />
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** "Footnote 3" -> "3", "Endnote 1, paragraph 2" -> "1". */
+function noteNumber(block: Block): string {
+  return /(\d+)/.exec(block.label)?.[1] ?? "";
 }
 
 function tooltip(violations: readonly Violation[]): string {
@@ -133,6 +165,7 @@ function BlockView({ block, byBlock, activeId, flash, onPick, registerBlock }: C
       className: cx(
         "relative scroll-my-24 rounded-md px-3 py-1 transition-colors",
         headingClass(block),
+        block.part === "textbox" && "mx-6 my-1 border border-dashed border-slate-300 text-sm",
         blockSeverity && SEVERITY_CLASSES[blockSeverity].block,
         active && !blockSeverity && "bg-indigo-50",
       ),

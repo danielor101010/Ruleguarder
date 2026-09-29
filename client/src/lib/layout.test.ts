@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { block, DOC } from "../test/fixtures";
-import { layoutBlocks } from "./layout";
+import { layoutBlocks, splitParts } from "./layout";
 
 describe("layoutBlocks", () => {
   it("keeps paragraphs in order and groups table cells", () => {
@@ -32,5 +32,24 @@ describe("layoutBlocks", () => {
 
   it("handles an empty document", () => {
     expect(layoutBlocks([])).toEqual([]);
+  });
+});
+
+describe("splitParts", () => {
+  it("routes blocks to their page region and keeps text boxes in the body", () => {
+    const parts = splitParts([
+      block({ id: 0, text: "Body" }),
+      block({ id: 1, text: "Box", part: "textbox" }),
+      block({ id: 2, text: "Head", part: "header" }),
+      block({ id: 3, text: "Foot", part: "footer" }),
+      block({ id: 4, text: "Note", part: "footnote" }),
+      block({ id: 5, text: "End", part: "endnote" }),
+      block({ id: 6, text: "Old" }), // parsed before parts existed: no `part`
+    ]);
+    expect(parts.body.map((b) => b.text)).toEqual(["Body", "Box", "Old"]);
+    expect(parts.headers.map((b) => b.text)).toEqual(["Head"]);
+    expect(parts.footers.map((b) => b.text)).toEqual(["Foot"]);
+    expect(parts.footnotes.map((b) => b.text)).toEqual(["Note"]);
+    expect(parts.endnotes.map((b) => b.text)).toEqual(["End"]);
   });
 });

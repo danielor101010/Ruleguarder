@@ -37,3 +37,36 @@ function buildTable(tableIndex: number, blocks: Block[]): TableLayout {
   for (const b of blocks) cells[(b.row ?? 1) - 1][(b.col ?? 1) - 1].push(b);
   return { kind: "table", tableIndex, rows, cols, cells };
 }
+
+export interface DocumentParts {
+  headers: Block[];
+  /** Body paragraphs, headings, tables and text boxes, in reading order. */
+  body: Block[];
+  footers: Block[];
+  footnotes: Block[];
+  endnotes: Block[];
+}
+
+/** Split blocks into the page regions they are shown in. */
+export function splitParts(blocks: readonly Block[]): DocumentParts {
+  const parts: DocumentParts = { headers: [], body: [], footers: [], footnotes: [], endnotes: [] };
+  for (const b of blocks) {
+    switch (b.part ?? "body") {
+      case "header":
+        parts.headers.push(b);
+        break;
+      case "footer":
+        parts.footers.push(b);
+        break;
+      case "footnote":
+        parts.footnotes.push(b);
+        break;
+      case "endnote":
+        parts.endnotes.push(b);
+        break;
+      default:
+        parts.body.push(b);
+    }
+  }
+  return parts;
+}

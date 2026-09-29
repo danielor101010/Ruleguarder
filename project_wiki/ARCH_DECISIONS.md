@@ -210,3 +210,17 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - The synchronous `POST /documents/{id}/check` stays for tests and scripts. Both paths share `finish_run` (with no rule checked → `failed`, else `completed`).
 
 **Consequences.** Single-process design: the cancel flag and worker pool live in memory, so several server replicas would need a shared queue (e.g. a DB-polled job table or Redis). Progress costs one small UPDATE per step.
+
+## ADR-019 – Parser coverage: every text-bearing part of a .docx (Accepted, 2026-09-29)
+**Context.** Only body paragraphs and top-level tables were read, so violations in headers, footers, footnotes, text boxes, nested tables, hyperlinks or field results were never found.
+**Decision.**
+- `Block.part`: `body | header | footer | footnote | endnote | textbox` (default `body`, so stored documents still load).
+- Order: body (with text boxes right after the paragraph that holds them), then headers/footers per section, then footnotes, then endnotes. First-occurrence rules (acronyms) therefore see the body first.
+- **Headers/footers:** default, first-page and even-page variants per section. Linked ones are skipped, and parts are de-duplicated by identity. Labels like "First-page header (section 2)".
+- **Footnotes/endnotes:** read from their XML parts (python-docx 1.2 has no API); separator notes are skipped. Labels "Footnote 3", numbered in part order (Word's display order in practice).
+- **Text boxes:** `w:txbxContent`, skipping the VML copy under `mc:Fallback` (Word stores each box twice).
+- **Nested tables:** walked recursively. Their cells keep the outer cell's position (that's where the UI draws them) and get a label naming both levels.
+- **Run text** includes runs inside `w:hyperlink`, `w:fldSimple` (e.g. SEQ caption numbers), content controls, smart tags and insertions. This fixes the ADR-011 limitation on caption numbers.
+- The UI shows Header / Footer / Footnotes / Endnotes as labelled regions of the white page, and text boxes as framed blocks, so click-to-locate works in every part.
+
+**Consequences.** Comments, tracked deletions and chart/SmartArt text are still not read. Footnote numbers assume the part order matches the reference order.
