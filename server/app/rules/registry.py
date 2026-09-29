@@ -18,6 +18,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from ..schemas import Block, Run
+from .acronyms import AcronymParams, check_acronym_definitions
 from .finding import Finding
 from .pii import PiiParams, check_pii
 
@@ -233,6 +234,13 @@ RULE_TYPES: dict[str, RuleType] = {
             "numbers. The report shows them masked.",
             PiiParams,
             check_pii,
+        ),
+        RuleType(
+            "acronym_definitions",
+            "Acronym definitions",
+            'Every acronym must be defined at its first use, as "Full Name (ABC)" or "ABC (Full Name)".',
+            AcronymParams,
+            check_acronym_definitions,
         ),
     ]
 }
