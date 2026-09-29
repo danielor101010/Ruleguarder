@@ -1,7 +1,8 @@
 import { useRef } from "react";
+import { DOCX_ACCEPT, formatSize } from "../lib/documents";
 import { cx } from "../lib/severity";
 import type { DocumentSummary } from "../types";
-import { Button, ErrorNote, GlassPanel } from "./ui";
+import { Button, DeleteButton, ErrorNote, Icon, Panel, PanelHeader } from "./ui";
 
 interface Props {
   documents: DocumentSummary[];
@@ -13,8 +14,6 @@ interface Props {
   onUpload: (file: File) => void;
   onDelete: (doc: DocumentSummary) => void;
 }
-
-const DOCX_ACCEPT = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export default function DocumentsPanel({
   documents,
@@ -29,12 +28,9 @@ export default function DocumentsPanel({
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <GlassPanel className="flex flex-col gap-3 p-5" aria-labelledby="documents-heading">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="documents-heading" className="text-base font-semibold text-slate-900">
-          Documents
-        </h2>
-        <Button size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
+    <Panel className="flex flex-col gap-4 p-4" aria-labelledby="documents-heading">
+      <PanelHeader id="documents-heading" title="Documents" count={documents.length}>
+        <Button size="sm" icon="upload" onClick={() => inputRef.current?.click()} disabled={uploading}>
           {uploading ? "Uploading…" : "Upload .docx"}
         </Button>
         <input
@@ -50,46 +46,48 @@ export default function DocumentsPanel({
             if (file) onUpload(file);
           }}
         />
-      </div>
+      </PanelHeader>
       {error && <ErrorNote>{error}</ErrorNote>}
-      {loading && <p className="text-sm text-slate-600">Loading documents…</p>}
-      {!loading && !documents.length && <p className="text-sm text-slate-600">No documents uploaded yet.</p>}
-      <ul className="flex flex-col gap-1" aria-label="Documents list">
+      {loading && <p className="text-sm text-slate-400">Loading documents…</p>}
+      {!loading && !documents.length && (
+        <p className="rounded-xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
+          No documents uploaded yet.
+        </p>
+      )}
+      <ul className="flex flex-col gap-2" aria-label="Documents list">
         {documents.map((doc) => {
           const selected = doc.id === selectedId;
           return (
             <li
               key={doc.id}
               className={cx(
-                "flex items-center gap-2 rounded-2xl pr-2",
-                selected ? "bg-white text-slate-900 shadow-sm ring-2 ring-slate-900" : "text-slate-900 hover:bg-white/60",
+                "flex items-center gap-2 rounded-xl border pr-2 transition-colors",
+                selected
+                  ? "border-indigo-400/60 bg-indigo-500/15"
+                  : "border-slate-700 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800",
               )}
             >
               <button
                 type="button"
-                className="min-w-0 flex-1 rounded-2xl px-3 py-2 text-left"
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2.5 pl-3 text-left"
                 aria-current={selected ? "true" : undefined}
                 onClick={() => onSelect(doc.id)}
               >
-                <span className="block truncate text-sm font-medium" dir="auto" title={doc.filename}>
-                  {doc.filename}
-                </span>
-                <span className="block text-xs text-slate-600">
-                  {(doc.size_bytes / 1024).toFixed(0)} KB · {new Date(doc.uploaded_at).toLocaleString()}
+                <Icon name="document" className={cx("size-5 shrink-0", selected ? "text-indigo-300" : "text-slate-500")} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-white" dir="auto" title={doc.filename}>
+                    {doc.filename}
+                  </span>
+                  <span className="block text-xs text-slate-400">
+                    {formatSize(doc.size_bytes)} · {new Date(doc.uploaded_at).toLocaleString()}
+                  </span>
                 </span>
               </button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => onDelete(doc)}
-                aria-label={`Delete ${doc.filename}`}
-              >
-                Delete
-              </Button>
+              <DeleteButton compact name={doc.filename} onConfirm={() => onDelete(doc)} />
             </li>
           );
         })}
       </ul>
-    </GlassPanel>
+    </Panel>
   );
 }

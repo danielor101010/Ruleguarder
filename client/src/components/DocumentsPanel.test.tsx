@@ -32,7 +32,20 @@ describe("DocumentsPanel", () => {
     expect(screen.getByRole("button", { name: /^b\.docx/ })).toHaveAttribute("aria-current", "true");
     await userEvent.click(screen.getByRole("button", { name: /^a\.docx/ }));
     expect(props.onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it("asks for confirmation before deleting a document", async () => {
+    const props = setup();
     await userEvent.click(screen.getByRole("button", { name: "Delete a.docx" }));
+    expect(props.onDelete).not.toHaveBeenCalled();
+
+    // "Keep" backs out without deleting
+    await userEvent.click(screen.getByRole("button", { name: "Keep" }));
+    expect(screen.queryByRole("button", { name: "Confirm delete a.docx" })).toBeNull();
+    expect(props.onDelete).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete a.docx" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirm delete a.docx" }));
     expect(props.onDelete).toHaveBeenCalledWith(props.documents[0]);
   });
 

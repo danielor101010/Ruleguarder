@@ -3,9 +3,10 @@ import type { SamplesState, TemplatesStatus } from "../hooks/useRuleTemplates";
 import { cx } from "../lib/severity";
 import { draftFromTemplate, usesAiQuota } from "../lib/templates";
 import type { Rule, RuleCreate, RuleTemplate, RuleType, RuleUpdate } from "../types";
+import RuleDetails from "./RuleDetails";
 import RuleForm from "./RuleForm";
 import TemplatePicker from "./TemplatePicker";
-import { AiQuotaBadge, Button, ErrorNote, GlassPanel, SeverityDot } from "./ui";
+import { AiQuotaBadge, Button, ErrorNote, Icon, IconButton, Panel, PanelHeader, SeverityDot, Switch } from "./ui";
 
 export interface TemplatesView {
   templates: RuleTemplate[];
@@ -52,26 +53,28 @@ export default function RulesPanel({
 }: Props) {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [viewingId, setViewingId] = useState<number | null>(null);
 
   /** A new key per opening, so the form state resets when another template or rule is picked. */
   function open(next: Editing) {
+    setViewingId(null);
     setEditing(next);
     setFormKey((k) => k + 1);
   }
 
-  const typeLabel = (key: string) => types.find((t) => t.key === key)?.label ?? key;
+  const typeOf = (key: string) => types.find((t) => t.key === key);
   const templatesAvailable = templates.status !== "unavailable";
+  // Look the rule up on every render, so the dialog reflects toggles and edits
+  const viewing = rules.find((r) => r.id === viewingId) ?? null;
+  const enabledCount = rules.filter((r) => r.enabled).length;
 
   return (
-    <GlassPanel className="flex flex-col gap-3 p-5" aria-labelledby="rules-heading">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="rules-heading" className="text-base font-semibold text-slate-900">
-          Rules
-        </h2>
-        <Button size="sm" onClick={() => open({ kind: "new", initial: null, source: null })} disabled={!types.length}>
-          + New rule
+    <Panel className="flex flex-col gap-4 p-4" aria-labelledby="rules-heading">
+      <PanelHeader id="rules-heading" title="Rules" count={rules.length}>
+        <Button size="sm" icon="plus" onClick={() => open({ kind: "new", initial: null, source: null })} disabled={!types.length}>
+          New rule
         </Button>
-      </div>
+      </PanelHeader>
 
       <div className="flex flex-wrap items-start gap-2">
         <TemplatePicker
@@ -82,24 +85,87 @@ export default function RulesPanel({
           onPick={(t) => open({ kind: "new", initial: draftFromTemplate(t), source: t.label })}
         />
         {templatesAvailable && (
-          <Button variant="secondary" size="sm" onClick={samples.onLoad} disabled={samples.loading}>
+          <Button variant="secondary" size="sm" icon="download" onClick={samples.onLoad} disabled={samples.loading}>
             {samples.loading ? "Loading samples…" : "Load Sample Rules"}
           </Button>
         )}
       </div>
       {!templatesAvailable && (
-        <p className="text-xs text-slate-600">Rule templates and sample rules are not available on this server.</p>
+        <p className="text-xs text-slate-400">Rule templates and sample rules are not available on this server.</p>
       )}
       {samples.message && (
-        <p role="status" className="flex items-center justify-between rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
+        <p role="status" className="flex items-center justify-between gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 ring-1 ring-emerald-500/30">
           Sample rules: {samples.message}
-          <button type="button" className="rounded-full px-1.5 hover:bg-emerald-100" aria-label="Dismiss" onClick={samples.onDismiss}>
-            ×
-          </button>
+          <IconButton icon="x" label="Dismiss" onClick={samples.onDismiss} className="-my-1 size-6" />
         </p>
       )}
       {samples.error && <ErrorNote onDismiss={samples.onDismiss}>{samples.error}</ErrorNote>}
       {error && <ErrorNote onDismiss={onDismissError}>{error}</ErrorNote>}
+
+      {loading && <p className="text-sm text-slate-400">Loading rules…</p>}
+      {!loading && !rules.length && (
+        <div className="rounded-xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
+          No rules yet.
+          <br />
+          Create one, pick a template, or load the sample rules.
+        </div>
+      )}
+      {rules.length > 0 && (
+        <p className="-mb-2 text-xs text-slate-400">
+          {enabledCount} of {rules.length} enabled · click a rule to see it
+        </p>
+      )}
+      <ul className="flex flex-col gap-2" aria-label="Rules list">
+        {rules.map((rule) => {
+          const ai = usesAiQuota(rule);
+          const instruction = ai && typeof rule.params.instruction === "string" ? rule.params.instruction : null;
+          return (
+            <li
+              key={rule.id}
+              className={cx(
+                "group flex items-center gap-3 rounded-xl border bg-slate-800/50 pr-3 transition-colors hover:border-slate-500 hover:bg-slate-800",
+                rule.enabled ? "border-slate-700" : "border-slate-800 opacity-70",
+              )}
+            >
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                aria-label={`Open rule ${rule.name}`}
+                className="flex min-w-0 flex-1 flex-col gap-1 rounded-xl py-3 pl-3 text-left"
+                onClick={() => setViewingId(rule.id)}
+              >
+                <span className="flex items-center gap-2">
+                  <SeverityDot severity={rule.severity} />
+                  <span className="truncate text-sm font-semibold text-white" dir="auto" title={rule.name}>
+                    {rule.name}
+                  </span>
+                </span>
+                <span className="line-clamp-2 text-xs text-slate-400" dir="auto">
+                  {instruction ?? typeOf(rule.type)?.label ?? rule.type}
+                </span>
+                {ai && (
+                  <span className="mt-0.5">
+                    <AiQuotaBadge />
+                  </span>
+                )}
+              </button>
+              <Switch checked={rule.enabled} onChange={() => onToggle(rule)} label={`Enable ${rule.name}`} size="sm" />
+              <Icon name="chevron" className="size-4 shrink-0 text-slate-500 group-hover:text-slate-300" />
+            </li>
+          );
+        })}
+      </ul>
+
+      {viewing && (
+        <RuleDetails
+          rule={viewing}
+          type={typeOf(viewing.type)}
+          onClose={() => setViewingId(null)}
+          onEdit={() => open({ kind: "edit", rule: viewing })}
+          onToggle={() => onToggle(viewing)}
+          onDelete={() => onDelete(viewing)}
+        />
+      )}
 
       {editing && (
         <RuleForm
@@ -113,53 +179,6 @@ export default function RulesPanel({
           onDone={() => setEditing(null)}
         />
       )}
-
-      {loading && <p className="text-sm text-slate-600">Loading rules…</p>}
-      {!loading && !rules.length && !editing && (
-        <p className="text-sm text-slate-600">No rules yet. Create one, pick a template, or load the sample rules.</p>
-      )}
-      <ul className="flex flex-col gap-1" aria-label="Rules list">
-        {rules.map((rule) => (
-          <li key={rule.id} className="flex items-start gap-3 rounded-2xl px-2 py-2 hover:bg-white/60">
-            <input
-              type="checkbox"
-              role="switch"
-              className="mt-0.5 size-4 shrink-0 accent-slate-900"
-              checked={rule.enabled}
-              onChange={() => onToggle(rule)}
-              aria-label={`Enable ${rule.name}`}
-            />
-            <div className="min-w-0 flex-1">
-              <div
-                className={cx(
-                  "flex items-center gap-2 text-sm font-medium",
-                  rule.enabled ? "text-slate-900" : "text-slate-500",
-                )}
-              >
-                <SeverityDot severity={rule.severity} />
-                <span className="line-clamp-2 break-words" dir="auto" title={rule.name}>
-                  {rule.name}
-                </span>
-                {!rule.enabled && <span className="shrink-0 text-xs font-normal text-slate-600">(off)</span>}
-              </div>
-              <div className="truncate text-xs text-slate-600" dir="auto">
-                {typeLabel(rule.type)}
-                {usesAiQuota(rule) && typeof rule.params.instruction === "string" && ` · ${rule.params.instruction}`}
-              </div>
-              <div className="mt-1 flex items-center gap-1">
-                {usesAiQuota(rule) && <AiQuotaBadge />}
-                <span className="flex-1" />
-                <Button variant="ghost" size="sm" onClick={() => open({ kind: "edit", rule })} aria-label={`Edit ${rule.name}`}>
-                  Edit
-                </Button>
-                <Button variant="danger" size="sm" onClick={() => onDelete(rule)} aria-label={`Delete ${rule.name}`}>
-                  Delete
-                </Button>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </GlassPanel>
+    </Panel>
   );
 }

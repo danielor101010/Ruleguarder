@@ -3,7 +3,8 @@ import DocumentsPanel from "./components/DocumentsPanel";
 import ReportView from "./components/ReportView";
 import RulesPanel from "./components/RulesPanel";
 import TopBar from "./components/TopBar";
-import { ErrorNote, GlassPanel } from "./components/ui";
+import EmptyState from "./components/EmptyState";
+import { ErrorNote, Panel } from "./components/ui";
 import { useDocumentReport } from "./hooks/useDocumentReport";
 import { useDocuments } from "./hooks/useDocuments";
 import { useRules } from "./hooks/useRules";
@@ -33,14 +34,9 @@ export default function App() {
   }
 
   return (
-    <div className="relative isolate flex min-h-screen flex-col overflow-x-hidden bg-linear-to-br from-slate-950 via-slate-900 to-navy-950 lg:h-screen">
-      {/* Soft colour glows behind the glass surfaces */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-32 left-1/4 size-[36rem] rounded-full bg-sky-500/20 blur-3xl" />
-        <div className="absolute right-0 bottom-0 size-[32rem] rounded-full bg-indigo-500/20 blur-3xl" />
-      </div>
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-slate-950 lg:h-screen">
       <TopBar documentName={report.document?.filename ?? null} counts={counts} />
-      <div className="relative grid flex-1 grid-cols-1 gap-4 p-4 sm:p-6 lg:min-h-0 lg:grid-cols-[22rem_minmax(0,1fr)]">
+      <div className="grid flex-1 grid-cols-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[23rem_minmax(0,1fr)]">
         <aside className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto" aria-label="Rules and documents">
           <RulesPanel
             rules={rules.rules}
@@ -85,17 +81,21 @@ export default function App() {
               onCheck={report.runCheck}
             />
           ) : (
-            <GlassPanel className="m-auto max-w-lg p-8 text-sm leading-7 text-slate-700">
-              {report.loading ? (
-                <p role="status">Loading…</p>
-              ) : (
-                <ol className="list-decimal space-y-1 pl-5">
-                  <li>Create rules on the left, pick a template, or load the sample rules.</li>
-                  <li>Upload a .docx document.</li>
-                  <li>Click “Check document” to see every violation and where it is.</li>
-                </ol>
-              )}
-            </GlassPanel>
+            report.loading ? (
+              <Panel className="flex flex-1 items-center justify-center p-8">
+                <p role="status" className="text-sm text-slate-400">
+                  Loading document…
+                </p>
+              </Panel>
+            ) : (
+              <EmptyState
+                documents={docs.documents}
+                rulesEnabled={rules.rules.filter((r) => r.enabled).length}
+                uploading={docs.uploading}
+                onUpload={upload}
+                onSelect={setSelectedId}
+              />
+            )
           )}
         </main>
       </div>

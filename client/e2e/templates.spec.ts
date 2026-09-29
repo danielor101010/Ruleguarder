@@ -25,10 +25,10 @@ test.describe("with the template endpoints", () => {
     await page.getByRole("button", { name: "Add from template" }).click();
     await page.getByRole("group", { name: "Rule templates" }).getByRole("button", { name: new RegExp(escapeRegExp(pick.label)) }).click();
     const form = page.getByRole("form", { name: "New rule" });
-    await expect(form.getByText(`From template: ${pick.label}`)).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "New rule" }).getByText(`From template: ${pick.label}`)).toBeVisible();
     await expect(form.getByLabel("Name")).toHaveValue(pick.rule.name);
     await expect(form.getByLabel("Type")).toHaveValue(pick.rule.type);
-    await form.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("dialog", { name: "New rule" }).getByRole("button", { name: "Cancel" }).click();
     await expect(form).toBeHidden();
   });
 
@@ -72,7 +72,7 @@ test("template picker and sample loading with mocked endpoints", async ({ page }
   await expect(form.getByLabel("Name")).toHaveValue("E2E no markings");
   await expect(form.getByLabel("Pattern")).toHaveValue("CONFIDENTIAL");
   await expect(form.getByLabel("Severity")).toHaveValue("medium");
-  await form.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("dialog", { name: "New rule" }).getByRole("button", { name: "Cancel" }).click();
 
   await page.getByRole("button", { name: "Load Sample Rules" }).click();
   await expect(page.getByText("Sample rules: 0 added, 2 already present")).toBeVisible();
@@ -87,5 +87,5 @@ test("without the template endpoints the UI hides the template features", async 
   await expect(page.getByText("Rule templates and sample rules are not available on this server.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add from template" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Load Sample Rules" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "+ New rule" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "New rule" })).toBeEnabled();
 });

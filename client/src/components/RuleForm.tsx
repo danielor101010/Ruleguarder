@@ -1,9 +1,9 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { errorMessage } from "../lib/errors";
 import { defaultParams } from "../lib/ruleParams";
 import { usesAiQuota } from "../lib/templates";
 import type { ParamSchema, Rule, RuleCreate, RuleType, RuleUpdate, Severity } from "../types";
-import { AiQuotaBadge, Button, ErrorNote, inputClass } from "./ui";
+import { AiQuotaBadge, Button, ErrorNote, inputClass, Modal, Switch } from "./ui";
 
 interface Props {
   types: RuleType[];
@@ -18,7 +18,7 @@ interface Props {
   onDone: () => void;
 }
 
-/** Schema-driven rule form. Render with a `key` per rule/template so its local state resets. */
+/** Schema-driven rule form in a modal. Render with a `key` per rule/template so its local state resets. */
 export default function RuleForm({ types, rule, initial, source, onCreate, onUpdate, onDone }: Props) {
   const start = rule ?? initial ?? null;
   // A blank new rule starts on a deterministic type, never on the quota-spending AI type
@@ -55,17 +55,31 @@ export default function RuleForm({ types, rule, initial, source, onCreate, onUpd
   }
 
   const isAi = usesAiQuota({ type: typeKey });
+  const formId = useId();
 
   return (
+    <Modal
+      title={rule ? "Edit rule" : "New rule"}
+      subtitle={source ? `From template: ${source}` : undefined}
+      onClose={onDone}
+      footer={
+        <>
+          <span className="flex-1" />
+          <Button variant="secondary" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="submit" form={formId} icon="check" disabled={saving || !type}>
+            {saving ? "Saving…" : "Save rule"}
+          </Button>
+        </>
+      }
+    >
     <form
+      id={formId}
       aria-label={rule ? `Edit rule ${rule.name}` : "New rule"}
       onSubmit={submit}
-      className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4"
+      className="flex flex-col gap-4"
     >
-      <div>
-        <h3 className="text-sm font-semibold text-slate-900">{rule ? "Edit rule" : "New rule"}</h3>
-        {source && <p className="text-xs text-slate-600">From template: {source}</p>}
-      </div>
 
       <Field label="Type">
         <select className={inputClass} value={typeKey} onChange={(e) => changeType(e.target.value)} disabled={!!rule}>
@@ -78,12 +92,12 @@ export default function RuleForm({ types, rule, initial, source, onCreate, onUpd
         </select>
       </Field>
       {type ? (
-        <p className="-mt-1 text-xs text-slate-600">{type.description}</p>
+        <p className="-mt-2 text-xs text-slate-400">{type.description}</p>
       ) : (
         typeKey && <ErrorNote>This server does not support the rule type “{typeKey}”.</ErrorNote>
       )}
       {isAi && (
-        <p className="flex items-center gap-2 text-xs text-violet-900">
+        <p className="flex items-center gap-2 rounded-xl bg-violet-500/10 px-3 py-2 text-xs text-violet-200 ring-1 ring-violet-400/30">
           <AiQuotaBadge /> Checked by the AI model; every check spends quota.
         </p>
       )}
@@ -115,30 +129,26 @@ export default function RuleForm({ types, rule, initial, source, onCreate, onUpd
         <input className={inputClass} dir="auto" value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
 
-      <label className="flex items-center gap-2 text-sm text-slate-800">
-        <input type="checkbox" className="size-4 accent-slate-900" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        Enabled
-      </label>
+      <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+        <span>
+          Enabled
+          <span className="block text-xs text-slate-400">Disabled rules are skipped when checking documents.</span>
+        </span>
+        <Switch checked={enabled} onChange={setEnabled} label="Enabled" />
+      </div>
 
       {error && <ErrorNote>{error}</ErrorNote>}
-      <div className="flex gap-2">
-        <Button type="submit" disabled={saving || !type}>
-          {saving ? "Saving…" : "Save rule"}
-        </Button>
-        <Button variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
     </form>
+    </Modal>
   );
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-slate-800">
+    <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-200">
       {label}
       {children}
-      {hint && <span className="text-xs font-normal text-slate-600">{hint}</span>}
+      {hint && <span className="text-xs font-normal text-slate-400">{hint}</span>}
     </label>
   );
 }
@@ -160,10 +170,10 @@ function ParamField({
 
   if (schema.type === "boolean") {
     return (
-      <label className="flex items-center gap-2 text-sm text-slate-800">
-        <input type="checkbox" className="size-4 accent-slate-900" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
+      <div className="flex items-center justify-between gap-3 text-sm text-slate-200">
         {label}
-      </label>
+        <Switch checked={Boolean(value)} onChange={onChange} label={label} size="sm" />
+      </div>
     );
   }
 

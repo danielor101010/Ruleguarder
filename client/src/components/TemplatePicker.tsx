@@ -1,8 +1,8 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import type { TemplatesStatus } from "../hooks/useRuleTemplates";
 import { groupTemplates, usesAiQuota } from "../lib/templates";
 import type { RuleTemplate } from "../types";
-import { AiQuotaBadge, Button, ErrorNote } from "./ui";
+import { AiQuotaBadge, Button, ErrorNote, Icon, Modal, SeverityBadge } from "./ui";
 
 interface Props {
   templates: RuleTemplate[];
@@ -12,10 +12,9 @@ interface Props {
   onPick: (template: RuleTemplate) => void;
 }
 
-/** "Add from template" disclosure. Renders nothing when the server has no template endpoint. */
+/** "Add from template" button + picker dialog. Renders nothing when the server has no template endpoint. */
 export default function TemplatePicker({ templates, status, error, onRetry, onPick }: Props) {
   const [open, setOpen] = useState(false);
-  const listId = useId();
 
   if (status === "unavailable") return null;
   if (status === "error") {
@@ -32,51 +31,52 @@ export default function TemplatePicker({ templates, status, error, onRetry, onPi
   const groups = groupTemplates(templates);
 
   return (
-    <div onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
+    <>
       <Button
         variant="secondary"
         size="sm"
-        aria-expanded={open}
-        aria-controls={listId}
+        icon="template"
+        aria-haspopup="dialog"
         disabled={status === "loading" || templates.length === 0}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(true)}
       >
         {status === "loading" ? "Loading templates…" : "Add from template"}
       </Button>
       {open && (
-        <div
-          id={listId}
-          role="group"
-          aria-label="Rule templates"
-          className="mt-2 flex max-h-80 flex-col gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3"
-        >
-          {groups.map((group) => (
-            <div key={group.category}>
-              <h4 className="mb-1 text-[0.7rem] font-semibold tracking-wider text-slate-600 uppercase">{group.label}</h4>
-              <ul className="flex flex-col gap-1">
-                {group.templates.map((t) => (
-                  <li key={t.id}>
-                    <button
-                      type="button"
-                      className="w-full rounded-xl px-3 py-2 text-left hover:bg-slate-100"
-                      onClick={() => {
-                        setOpen(false);
-                        onPick(t);
-                      }}
-                    >
-                      <span className="flex items-center gap-2 text-sm font-medium text-slate-900">
-                        {t.label}
-                        {usesAiQuota(t.rule) && <AiQuotaBadge />}
-                      </span>
-                      <span className="block text-xs text-slate-600">{t.description}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+        <Modal title="Add a rule from a template" subtitle="Pick a template, review it, then save." size="lg" onClose={() => setOpen(false)}>
+          <div role="group" aria-label="Rule templates" className="flex flex-col gap-6">
+            {groups.map((group) => (
+              <section key={group.category}>
+                <h3 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">{group.label}</h3>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {group.templates.map((t) => (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        className="group flex h-full w-full flex-col gap-2 rounded-xl border border-slate-700 bg-slate-800/60 p-4 text-left transition-colors hover:border-indigo-400 hover:bg-slate-800"
+                        onClick={() => {
+                          setOpen(false);
+                          onPick(t);
+                        }}
+                      >
+                        <span className="flex items-start justify-between gap-2">
+                          <span className="font-semibold text-white">{t.label}</span>
+                          <Icon name="plus" className="size-4 shrink-0 text-slate-500 group-hover:text-indigo-300" />
+                        </span>
+                        <span className="text-sm text-slate-300">{t.description}</span>
+                        <span className="mt-auto flex flex-wrap gap-2 pt-1">
+                          <SeverityBadge severity={t.rule.severity ?? "high"} />
+                          {usesAiQuota(t.rule) && <AiQuotaBadge />}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </Modal>
       )}
-    </div>
+    </>
   );
 }

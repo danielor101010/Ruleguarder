@@ -4,7 +4,7 @@ import { useViolationFocus } from "../hooks/useViolationFocus";
 import { violationsByBlock } from "../lib/highlight";
 import type { DocumentFull, Violation } from "../types";
 import DocumentPane from "./DocumentPane";
-import { AiQuotaBadge, Button, GlassPanel } from "./ui";
+import { AiQuotaBadge, Button, Panel } from "./ui";
 import ViolationsPanel from "./ViolationsPanel";
 
 interface Props {
@@ -27,28 +27,30 @@ export default function ReportView({ document, violations, checking, checkedAt, 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <GlassPanel className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+      <Panel className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-base font-semibold text-slate-900" dir="auto" title={document.filename}>
+          <h2 className="truncate text-base font-semibold text-white" dir="auto" title={document.filename}>
             {document.filename}
           </h2>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-slate-400">
             {checkedAt ? `Checked ${new Date(checkedAt).toLocaleString()}` : "Not checked yet"}
           </p>
         </div>
         {aiRulesEnabled > 0 && (
-          <span className="flex items-center gap-2 text-xs text-slate-700">
+          <span className="flex items-center gap-2 text-xs text-slate-400">
             <AiQuotaBadge />
             {aiRulesEnabled} AI {aiRulesEnabled === 1 ? "rule" : "rules"} enabled
           </span>
         )}
-        <Button onClick={onCheck} disabled={checking}>
+        <Button icon="play" onClick={onCheck} disabled={checking}>
           {checking ? "Checking…" : violations ? "Re-check" : "Check document"}
         </Button>
-      </GlassPanel>
+      </Panel>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <GlassPanel as="article" aria-label="Document" className="min-h-0 p-6 lg:overflow-y-auto">
+        <Panel as="article" aria-label="Document" className="min-h-0 bg-slate-800/40 p-3 sm:p-5 lg:overflow-y-auto">
+          {/* The document is shown as a white page for readability */}
+          <div className="mx-auto max-w-3xl rounded-lg bg-white px-5 py-8 text-slate-900 shadow-xl sm:px-10">
           <DocumentPane
             blocks={document.blocks}
             byBlock={byBlock}
@@ -57,23 +59,24 @@ export default function ReportView({ document, violations, checking, checkedAt, 
             onPick={focus.selectFromDocument}
             registerBlock={focus.registerBlock}
           />
-        </GlassPanel>
+          </div>
+        </Panel>
 
-        <GlassPanel as="aside" aria-labelledby="violations-heading" className="flex min-h-0 flex-col gap-3 p-5 lg:overflow-y-auto">
-          <h3 id="violations-heading" className="text-base font-semibold text-slate-900">
+        <Panel as="aside" aria-labelledby="violations-heading" className="flex min-h-0 flex-col gap-3 p-4 lg:overflow-y-auto">
+          <h3 id="violations-heading" className="flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-200 uppercase">
             Violations
-            {violations && <span className="ml-2 text-sm font-normal text-slate-600">{violations.length} total</span>}
+            {violations && <span className="text-sm font-normal tracking-normal text-slate-400 normal-case">{violations.length} total</span>}
           </h3>
           {checking && (
-            <p role="status" className="text-sm text-slate-600">
+            <p role="status" className="text-sm text-slate-400">
               Checking the document… AI rules can take a minute on long documents.
             </p>
           )}
           {!checking && violations === null && (
-            <p className="text-sm text-slate-600">Not checked yet. Click “Check document”.</p>
+            <p className="text-sm text-slate-400">Not checked yet. Click “Check document”.</p>
           )}
           {!checking && violations?.length === 0 && (
-            <p role="status" className="rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 ring-1 ring-emerald-200">
+            <p role="status" className="rounded-xl bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 ring-1 ring-emerald-500/30">
               No violations found ✓
             </p>
           )}
@@ -94,7 +97,7 @@ export default function ReportView({ document, violations, checking, checkedAt, 
               registerItem={focus.registerItem}
             />
           )}
-        </GlassPanel>
+        </Panel>
       </div>
     </div>
   );

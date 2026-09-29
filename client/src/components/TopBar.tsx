@@ -1,6 +1,6 @@
 import { cx, SEVERITY_CLASSES, SEVERITY_LABEL } from "../lib/severity";
 import { SEVERITIES, type Severity } from "../types";
-import { SeverityDot } from "./ui";
+import { Icon, SeverityDot } from "./ui";
 
 interface Props {
   documentName: string | null;
@@ -10,29 +10,27 @@ interface Props {
 
 export default function TopBar({ documentName, counts }: Props) {
   return (
-    <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-white/10 bg-slate-950/60 px-4 py-3 backdrop-blur-md sm:px-6">
-      <div className="flex items-baseline gap-3">
+    <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-slate-800 bg-slate-900 px-4 py-3 sm:px-6">
+      <div className="flex items-center gap-2.5">
+        <span className="flex size-8 items-center justify-center rounded-lg bg-indigo-500 text-white">
+          <Icon name="shield" className="size-5" />
+        </span>
         <h1 className="text-lg font-bold tracking-tight text-white">Ruleguarder</h1>
-        <span className="hidden text-sm text-slate-300 sm:inline">Check Word documents against your rules</span>
       </div>
       {documentName && (
-        <p className="min-w-0 flex-1 truncate text-sm text-slate-200" dir="auto" title={documentName}>
-          <span className="text-slate-400">Document: </span>
-          {documentName}
+        <p className="flex min-w-0 flex-1 items-center gap-2 text-sm text-slate-200" title={documentName}>
+          <Icon name="document" className="size-4 shrink-0 text-slate-500" />
+          <span className="truncate" dir="auto">
+            {documentName}
+          </span>
         </p>
       )}
       {counts && (
-        <ul className="ml-auto flex items-center gap-2" aria-label="Violations by severity">
+        <ul className="ml-auto flex items-center gap-5" aria-label="Violations by severity">
           {SEVERITIES.map((s) => (
-            <li
-              key={s}
-              className={cx(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1",
-                SEVERITY_CLASSES[s].counter,
-              )}
-            >
+            <li key={s} className={cx("inline-flex items-center gap-2 text-sm font-medium", SEVERITY_CLASSES[s].text)}>
               <SeverityDot severity={s} />
-              {SEVERITY_LABEL[s]} <span className="tabular-nums">{counts[s] ?? 0}</span>
+              {SEVERITY_LABEL[s]} <span className="font-semibold text-white tabular-nums">{counts[s] ?? 0}</span>
             </li>
           ))}
         </ul>

@@ -15,13 +15,13 @@ test.afterEach(async ({ request }) => {
 });
 
 async function createForbiddenTextRule(page: Page, name: string, pattern: string) {
-  await page.getByRole("button", { name: "+ New rule" }).click();
+  await page.getByRole("button", { name: "New rule" }).click();
   const form = page.getByRole("form", { name: "New rule" });
   await form.getByLabel("Type").selectOption("forbidden_text");
   await form.getByLabel("Name").fill(name);
   await form.getByLabel("Pattern").fill(pattern);
   await form.getByLabel("Severity").selectOption("high");
-  await form.getByRole("button", { name: "Save rule" }).click();
+  await page.getByRole("dialog", { name: "New rule" }).getByRole("button", { name: "Save rule" }).click();
   await expect(form).toBeHidden();
   await expect(page.getByRole("list", { name: "Rules list" }).getByText(name)).toBeVisible();
 }

@@ -7,9 +7,6 @@
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 
-  --color-accent: #0f172a; /* dark pill buttons */
-  --color-accent-hover: #1e293b;
-  --color-navy-950: #0b1733;
 
   --color-sev-high: #dc2626;
   --color-sev-medium: #ea580c;
@@ -19,13 +16,11 @@
 
   @keyframes flash {
     0%,
-    35% {
-      background-color: rgb(56 189 248 / 0.35);
-      box-shadow: 0 0 0 4px rgb(56 189 248 / 0.75);
+    30% {
+      background-color: rgb(129 140 248 / 0.28);
     }
     100% {
-      background-color: transparent;
-      box-shadow: 0 0 0 0 rgb(56 189 248 / 0);
+      background-color: rgb(129 140 248 / 0);
     }
   }
 }
@@ -39,9 +34,9 @@
     @apply bg-slate-950 font-sans text-slate-100 antialiased;
   }
 
-  /* Visible keyboard focus everywhere, readable on both dark shell and light glass surfaces */
+  /* Visible keyboard focus only (never on mouse click), readable on dark and on the white page */
   :focus-visible {
-    outline: 2px solid var(--color-sky-400);
+    outline: 2px solid var(--color-indigo-400);
     outline-offset: 2px;
   }
 

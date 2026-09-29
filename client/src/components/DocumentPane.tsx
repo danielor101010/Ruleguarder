@@ -15,7 +15,7 @@ interface CommonProps {
 
 /** The document as paragraphs, headings and tables, with severity highlights. */
 export default function DocumentPane({ blocks, ...props }: CommonProps & { blocks: Block[] }) {
-  if (!blocks.length) return <p className="text-sm text-slate-600">This document has no text.</p>;
+  if (!blocks.length) return <p className="text-sm text-slate-500">This document has no text.</p>;
   return (
     <div className="flex flex-col gap-2">
       {layoutBlocks(blocks).map((item) =>
@@ -28,7 +28,7 @@ export default function DocumentPane({ blocks, ...props }: CommonProps & { block
                 {item.cells.map((row, r) => (
                   <tr key={r}>
                     {row.map((cellBlocks, c) => (
-                      <td key={c} className="border border-slate-300 bg-white/60 p-1.5 align-top">
+                      <td key={c} className="border border-slate-200 p-1.5 align-top">
                         {cellBlocks.map((b) => (
                           <BlockView key={b.id} block={b} {...props} />
                         ))}
@@ -100,9 +100,9 @@ function BlockView({ block, byBlock, activeId, flash, onPick, registerBlock }: C
             role="button"
             tabIndex={0}
             className={cx(
-              "rounded-sm px-0.5 text-slate-950 underline decoration-2 underline-offset-2",
+              "rounded-sm px-0.5 text-slate-950 underline decoration-2 underline-offset-4 transition-colors",
               SEVERITY_CLASSES[severity].mark,
-              segActive && "ring-2 ring-slate-900",
+              segActive && "decoration-[3px] brightness-95 saturate-150",
             )}
             title={tooltip(seg.violations)}
             onClick={(e) => {
@@ -131,10 +131,10 @@ function BlockView({ block, byBlock, activeId, flash, onPick, registerBlock }: C
       role: flagged ? "button" : undefined,
       tabIndex: flagged ? 0 : undefined,
       className: cx(
-        "relative scroll-my-24 rounded-lg px-2 py-1 transition-shadow",
+        "relative scroll-my-24 rounded-md px-3 py-1 transition-colors",
         headingClass(block),
         blockSeverity && SEVERITY_CLASSES[blockSeverity].block,
-        active && "ring-2 ring-sky-500 ring-offset-2 ring-offset-white",
+        active && !blockSeverity && "bg-indigo-50",
       ),
       onClick: flagged ? pickBlock : undefined,
       onKeyDown: flagged ? onActivate(pickBlock) : undefined,
@@ -146,7 +146,7 @@ function BlockView({ block, byBlock, activeId, flash, onPick, registerBlock }: C
         key={flash.nonce}
         aria-hidden="true"
         data-testid="flash-overlay"
-        className="pointer-events-none absolute inset-0 animate-flash rounded-lg motion-reduce:animate-none motion-reduce:bg-sky-300/30"
+        className="pointer-events-none absolute inset-0 animate-flash rounded-md motion-reduce:animate-none motion-reduce:bg-indigo-200/40"
       />
     ),
   );
