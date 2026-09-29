@@ -8,3 +8,5 @@ dist/
 .DS_Store
 client/test-results/
 client/playwright-report/
+.claude/worktrees/
+*.tsbuildinfo
