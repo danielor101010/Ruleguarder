@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api";
+import { errorMessage } from "../lib/errors";
 import type { DocumentFull, Violation } from "../types";
 
 export interface DocumentReportState {
@@ -70,8 +71,4 @@ async function load(documentId: number): Promise<Partial<DocumentReportState>> {
     if (!(err instanceof ApiError && err.status === 404)) throw err;
     return { document: await api.document(documentId) };
   }
-}
-
-export function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

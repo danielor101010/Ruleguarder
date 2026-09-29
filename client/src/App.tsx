@@ -1,52 +1,74 @@
-import { useCallback, useEffect, useState } from "react";
-import { api } from "./api";
+import { useMemo, useState } from "react";
 import DocumentsPanel from "./components/DocumentsPanel";
 import ReportView from "./components/ReportView";
 import RulesPanel from "./components/RulesPanel";
-import { errorMessage, useDocumentReport } from "./hooks/useDocumentReport";
-import type { DocumentSummary, Rule } from "./types";
+import TopBar from "./components/TopBar";
+import { ErrorNote, GlassPanel } from "./components/ui";
+import { useDocumentReport } from "./hooks/useDocumentReport";
+import { useDocuments } from "./hooks/useDocuments";
+import { useRules } from "./hooks/useRules";
+import { useRuleTemplates } from "./hooks/useRuleTemplates";
+import { countBySeverity } from "./lib/highlight";
+import { usesAiQuota } from "./lib/templates";
+import type { DocumentSummary } from "./types";
 
+/** Container: wires the data hooks to the presentation components. */
 export default function App() {
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
-  const [listError, setListError] = useState<string | null>(null);
+  const rules = useRules();
+  const templates = useRuleTemplates(rules.reload);
+  const docs = useDocuments();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const report = useDocumentReport(selectedId);
 
-  const loadRules = useCallback(
-    () => api.rules().then(setRules).catch((e: unknown) => setListError(errorMessage(e))),
-    [],
-  );
-  const loadDocuments = useCallback(
-    () => api.documents().then(setDocuments).catch((e: unknown) => setListError(errorMessage(e))),
-    [],
-  );
+  const counts = useMemo(() => (report.violations ? countBySeverity(report.violations) : null), [report.violations]);
+  const aiRulesEnabled = rules.rules.filter((r) => r.enabled && usesAiQuota(r)).length;
 
-  useEffect(() => {
-    void loadRules();
-    void loadDocuments();
-  }, [loadRules, loadDocuments]);
+  async function upload(file: File) {
+    const doc = await docs.upload(file);
+    if (doc) setSelectedId(doc.id);
+  }
 
-  const error = report.error ?? listError;
+  async function removeDocument(doc: DocumentSummary) {
+    if ((await docs.remove(doc.id)) && doc.id === selectedId) setSelectedId(null);
+  }
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <h1>Ruleguarder</h1>
-        <span className="muted">Check Word documents against your rules</span>
-      </header>
-      <div className="layout">
-        <aside className="sidebar">
-          <RulesPanel rules={rules} onChange={loadRules} />
+    <div className="flex min-h-screen flex-col bg-linear-to-br from-slate-950 via-slate-900 to-navy-950 lg:h-screen">
+      <TopBar documentName={report.document?.filename ?? null} counts={counts} />
+      <div className="grid flex-1 gap-4 p-4 sm:p-6 lg:min-h-0 lg:grid-cols-[22rem_minmax(0,1fr)]">
+        <aside className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto" aria-label="Rules and documents">
+          <RulesPanel
+            rules={rules.rules}
+            types={rules.types}
+            loading={rules.loading}
+            error={rules.error}
+            onDismissError={rules.dismissError}
+            onCreate={rules.createRule}
+            onUpdate={rules.updateRule}
+            onToggle={rules.toggleRule}
+            onDelete={rules.deleteRule}
+            templates={{
+              templates: templates.templates,
+              status: templates.status,
+              error: templates.error,
+              onRetry: templates.retry,
+            }}
+            samples={{ ...templates.samples, onLoad: templates.loadSamples, onDismiss: templates.dismissSamples }}
+          />
           <DocumentsPanel
-            documents={documents}
+            documents={docs.documents}
             selectedId={selectedId}
+            loading={docs.loading}
+            uploading={docs.uploading}
+            error={docs.error}
             onSelect={setSelectedId}
-            onChange={loadDocuments}
+            onUpload={upload}
+            onDelete={removeDocument}
           />
         </aside>
-        <main className="main">
-          {error && <p className="error banner">{error}</p>}
+
+        <main className="flex min-w-0 flex-col gap-4 lg:min-h-0">
+          {report.error && <ErrorNote>{report.error}</ErrorNote>}
           {report.document ? (
             <ReportView
               key={`${report.document.id}-${report.checkedAt ?? "unchecked"}`}
@@ -54,20 +76,21 @@ export default function App() {
               violations={report.violations}
               checking={report.checking}
               checkedAt={report.checkedAt}
+              aiRulesEnabled={aiRulesEnabled}
               onCheck={report.runCheck}
             />
           ) : (
-            <div className="empty">
+            <GlassPanel className="m-auto max-w-lg p-8 text-sm leading-7 text-slate-700">
               {report.loading ? (
-                <p>Loading…</p>
+                <p role="status">Loading…</p>
               ) : (
-                <>
-                  <p>1. Create rules on the left (e.g. “no numeric figures that reveal system performance”).</p>
-                  <p>2. Upload a .docx document.</p>
-                  <p>3. Click “Check document” to see every violation and where it is.</p>
-                </>
+                <ol className="list-decimal space-y-1 pl-5">
+                  <li>Create rules on the left, pick a template, or load the sample rules.</li>
+                  <li>Upload a .docx document.</li>
+                  <li>Click “Check document” to see every violation and where it is.</li>
+                </ol>
               )}
-            </div>
+            </GlassPanel>
           )}
         </main>
       </div>
