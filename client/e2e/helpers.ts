@@ -47,5 +47,5 @@ export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordproc
 
 /** Match text literally inside a RegExp (template labels contain parentheses, e.g. "(PII)"). */
 export function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\]/g, "\$&");
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
