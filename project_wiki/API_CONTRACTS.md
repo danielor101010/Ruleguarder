@@ -101,3 +101,43 @@ interface Report {
 
 ## Internal LLM contract
 `LlmProvider.find_violations(rules: LlmRule[], blocks: LlmBlock[]) -> LlmViolation[]`, where `LlmViolation = {rule_id, block_id | None, quote, explanation}`. See ADR-004 for how quotes become offsets.
+
+---
+
+## Spec (2026-09-29): rule templates & sample rules — `feature/rule-templates`
+Status: **specified, in implementation.**
+
+### New deterministic rule types
+| key | params | Finding |
+|---|---|---|
+| `pii` | `categories: ("ssn" \| "phone" \| "email" \| "credit_card")[]` (default: all four, min 1) | One per match, at the exact span. The message names the category and **masks** the value (e.g. `Credit card number (•••• 1111)`, `Email address (j•••@example.com)`) |
+| `acronym_definitions` | `min_length: int = 2`, `max_length: int = 6`, `ignore: string[]` (default common tokens, e.g. `["OK","PDF","USA","UK","EU","ID","TV","AM","PM"]`) | Only the **first occurrence** of each acronym (all-caps token, digits allowed after the first letter) that is not defined there. Defined = written as `Full Name (ABC)` or `ABC (Full Name)` at that first occurrence. One finding per acronym |
+| `cross_references` | `kinds: ("section" \| "figure" \| "table")[]` (default all) | One per reference (`Section 3.2`, `see Figure 4`, `Table 2`, case-insensitive; `Sec.`/`Fig.` abbreviations) whose target doesn't exist. Targets: **section** = a heading whose text starts with that number, or whose computed outline number (from heading levels; Title excluded) matches; **figure** = a caption paragraph (style `Caption`, or text starting `Figure N`); **table** = a caption `Table N`, or the N-th table in the document. A caption itself is not a reference |
+
+### New endpoints
+| Method | Path | Response |
+|---|---|---|
+| GET | `/api/rules/templates` | `RuleTemplate[]` |
+| POST | `/api/rules/samples` | `201 { created: Rule[], skipped: string[] }`: creates every template with `in_sample_set: true`, skipping names that already exist (idempotent) |
+
+```ts
+interface RuleTemplate {
+  id: string;                 // stable slug, e.g. "pii-all"
+  label: string;
+  description: string;
+  category: "security" | "privacy" | "style" | "structure" | "ai";
+  in_sample_set: boolean;
+  rule: RuleCreate;           // ready to POST /api/rules (the UI may let the user edit it first)
+}
+```
+Sample set: PII (all), acronym definitions, cross-references, forbidden classification markings (regex `\b(TOP SECRET|CONFIDENTIAL|RESTRICTED)\b`), max sentence length 40, **and** an AI rule "No performance figures". The AI rule is created **disabled** (`enabled: false`) because running it spends LLM quota.
+
+---
+
+## Spec (2026-09-29): dashboard UI — `feature/dashboard-ui`
+Status: **specified, in implementation.**
+- **Stack:** Tailwind CSS (Vite plugin); `styles.css` is replaced. English, LTR.
+- **Design:** dark slate/navy dashboard shell (`slate-950` → navy gradient). Content surfaces use the wiki's glass tokens (`backdrop-blur-md bg-white/70 border border-white/40 rounded-2xl/3xl`); primary buttons are dark pills (`#0F172A`, `rounded-full`). Accessible contrast and visible focus rings.
+- **Layout:** top bar (brand, document name, severity counters). Left sidebar: Rules panel (New rule, **Add from template** picker, **Load Sample Rules** button, enable toggles) and Documents panel (upload, list). Main: **split screen**. Left = document paragraphs with severity highlights (High red, Medium orange, Low yellow). Right = violations list with severity filter chips (with counts) and a rule filter. Clicking a violation smoothly scrolls to the paragraph and **flashes** it (~1.5 s), and it stays marked active.
+- **Architecture:** components render only. Data in hooks (`useRules`, `useDocuments`, `useDocumentReport`, `useRuleTemplates`); pure logic in `lib/`.
+- **Tests:** Vitest for new hooks/components. Playwright E2E against the running stack, using **non-LLM rules only** (never triggers a Gemini call).
