@@ -88,16 +88,61 @@ _6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --stri
 - [x] Upload drop zone + recent documents; phone layout puts the main area first
 - [x] Tests: client 93 ✅, Playwright 5 passed / 1 skipped ✅
 
-## Decisions for you
+## Decisions for you (open)
 - [x] `claude.md` §4: left as is (your call); ADR-014 records the dark design
-- [!] PII masking is cosmetic: full values stay in excerpts and stored documents (ADR-011). Mask excerpts? Retention/encryption for uploads?
-- [!] Merge plan: these branches are stacked and not merged into `dev`. Open a PR / merge when you're ready
+- [x] Real AI rules: checked by you on `gemini-3.5-flash`, working
+- [!] **Merge plan:** 8 stacked branches, none merged into `dev`. Suggested: one PR `fix/dashboard-ux` → `dev`
+- [!] **Data sensitivity:** Gemini free tier may use submitted content (see `.env.example`); paid key for sensitive documents?
+- [!] **PII storage:** masking is cosmetic; full values stay in excerpts and stored documents (ADR-011). Mask excerpts? Retention/encryption for uploads?
+- [!] **Known limits of the new checks:** part numbers like "0301-2345-678" read as phones; "API SDK" side by side skipped; "Chapter N" not checked
 
-## Later
-- [ ] Decide on data sensitivity: free-tier Gemini may use submitted content (see `.env.example`)
-- [ ] Evaluation set: documents with known violations → measure LLM recall, tune prompt
-- [ ] Background jobs with progress for long documents
-- [ ] Headers, footers, footnotes, text boxes, nested tables in the parser
-- [ ] Export report (DOCX with Word comments / PDF)
-- [ ] Mark a violation as false positive / accepted
-- [ ] Auth / users, Alembic migrations
+---
+
+# Missions (written 2026-09-29, not started)
+Order set by you. Each mission gets its own branch, tests, and wiki update per `project_wiki/claude.md`.
+
+## M1 – "Are you sure?" pop-up before deleting — `feature/delete-confirm-dialog`
+Today delete is a two-step inline button (Delete → Delete / Keep). Replace it with a confirmation pop-up.
+- [ ] `ConfirmDialog` built on the existing accessible `Modal`: title "Delete <name>?", the consequence spelled out (e.g. "This also deletes its stored reports" for documents), buttons **Cancel** (default focus) and **Delete** (red)
+- [ ] Used for deleting rules (from the rule pop-up) and documents (from the list)
+- [ ] Escape / backdrop / Cancel close without deleting; focus returns to the Delete button
+- **Done when:** Vitest covers confirm, cancel, Escape and focus return; Playwright deletes a rule and a document through the pop-up; no delete happens without confirming
+
+## M2 – Accuracy test set for the AI rules — `feature/llm-eval-set`
+Measure how many real violations the AI catches (recall) and how many it invents (false positives), then tune the prompt.
+- [ ] 8–12 sample .docx files (English + Hebrew) with **known, labelled** violations: performance figures, architecture/data-flow details, plus traps that must NOT be flagged (e.g. "approximately fast", years, page numbers)
+- [ ] Labels file: rule → expected quotes per document
+- [ ] Eval script: runs the AI rules and matches found quotes to labels → recall, precision, per-rule table, list of misses
+- [ ] Opt-in only, never in the default test run; prints the number of API calls **before** running and asks for confirmation
+- [ ] Baseline report saved in the wiki; then prompt/effort tuning, with each change compared against the baseline
+- **Done when:** a baseline recall/precision is recorded and each prompt change has before/after numbers. ⚠️ Spends quota: run count agreed with you first
+
+## M3 – Background checks with a progress bar — `feature/background-checks`
+Long documents keep the page waiting today (one blocking request).
+- [ ] `POST /documents/{id}/check` returns at once with a check id; the check runs in the background
+- [ ] `check_runs` gets `status` (queued / running / completed / failed / cancelled) and progress (`done_chunks` / `total_chunks`, current step)
+- [ ] `GET /checks/{id}` for status; the client polls (or uses server-sent events) and shows a progress bar: "Checking… chunk 3 of 7 (AI rules)"
+- [ ] Cancel button; a failed check shows its error; the page can be reloaded mid-check and reconnects to the running check
+- [ ] Only one running check per document at a time
+- **Done when:** unit tests cover the state transitions, E2E covers progress → result (non-AI rules, with a slow fake), and the API contract + ADR are updated
+
+## M4 – Read more of the document — `feature/parser-coverage`
+Parts of a .docx are currently ignored, so violations there are never found.
+- [ ] Headers and footers (per section, deduplicated), labelled e.g. "Header (section 1)"
+- [ ] Footnotes and endnotes, labelled "Footnote 3"
+- [ ] Text boxes and shapes
+- [ ] Tables nested inside tables
+- [ ] Hyperlink text and field results (e.g. SEQ caption numbers), which fixes the cross-reference caption limitation
+- [ ] The document view shows these parts in their own sections so highlights still point at the right place
+- **Done when:** a fixture .docx containing every part type is parsed with correct labels and offsets, rules find violations in each part, and the E2E click-to-locate works for a header and a footnote
+
+## Low priority
+- [ ] **L1 – Redesign the design** — `feature/visual-redesign`: a fuller visual pass (typography, spacing, colour system, polish), after M1–M4. Scope to be agreed with you first (references / screenshots of what you like)
+
+## Backlog (not prioritised)
+- [ ] Mark a violation as "not a problem" (false positive / accepted), so it stops showing on re-check
+- [ ] Export the report (Word file with comments at each violation, or PDF)
+
+## Not needed for now (your call)
+- [ ] Pick rule options from a list (multi-select) instead of comma-separated text
+- [ ] User logins, database migrations (Alembic)

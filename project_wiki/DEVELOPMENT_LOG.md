@@ -111,5 +111,5 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 ---
 
 ## Open items
+Planned work (M1–M4, L1, backlog) lives in `TODO.md` → *Missions*.
 - PII data protection: masking is cosmetic (ADR-011). Decide on excerpt masking and document retention/encryption.
-- Multi-select input for array params (e.g. PII categories).
