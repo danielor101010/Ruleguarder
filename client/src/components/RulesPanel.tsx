@@ -120,40 +120,43 @@ export default function RulesPanel({
       )}
       <ul className="flex flex-col gap-1" aria-label="Rules list">
         {rules.map((rule) => (
-          <li
-            key={rule.id}
-            className={cx(
-              "flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/60",
-              !rule.enabled && "opacity-60",
-            )}
-          >
+          <li key={rule.id} className="flex items-start gap-3 rounded-2xl px-2 py-2 hover:bg-white/60">
             <input
               type="checkbox"
               role="switch"
-              className="size-4 shrink-0 accent-slate-900"
+              className="mt-0.5 size-4 shrink-0 accent-slate-900"
               checked={rule.enabled}
               onChange={() => onToggle(rule)}
               aria-label={`Enable ${rule.name}`}
             />
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+              <div
+                className={cx(
+                  "flex items-center gap-2 text-sm font-medium",
+                  rule.enabled ? "text-slate-900" : "text-slate-500",
+                )}
+              >
                 <SeverityDot severity={rule.severity} />
-                <span className="truncate" dir="auto" title={rule.name}>
+                <span className="line-clamp-2 break-words" dir="auto" title={rule.name}>
                   {rule.name}
                 </span>
-                {usesAiQuota(rule) && <AiQuotaBadge />}
+                {!rule.enabled && <span className="shrink-0 text-xs font-normal text-slate-600">(off)</span>}
               </div>
               <div className="truncate text-xs text-slate-600" dir="auto">
                 {typeLabel(rule.type)}
                 {usesAiQuota(rule) && typeof rule.params.instruction === "string" && ` · ${rule.params.instruction}`}
               </div>
+              <div className="mt-1 flex items-center gap-1">
+                {usesAiQuota(rule) && <AiQuotaBadge />}
+                <span className="flex-1" />
+                <Button variant="ghost" size="sm" onClick={() => open({ kind: "edit", rule })} aria-label={`Edit ${rule.name}`}>
+                  Edit
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => onDelete(rule)} aria-label={`Delete ${rule.name}`}>
+                  Delete
+                </Button>
+              </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => open({ kind: "edit", rule })} aria-label={`Edit ${rule.name}`}>
-              Edit
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => onDelete(rule)} aria-label={`Delete ${rule.name}`}>
-              Delete
-            </Button>
           </li>
         ))}
       </ul>

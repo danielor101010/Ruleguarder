@@ -33,9 +33,14 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-linear-to-br from-slate-950 via-slate-900 to-navy-950 lg:h-screen">
+    <div className="relative isolate flex min-h-screen flex-col overflow-x-hidden bg-linear-to-br from-slate-950 via-slate-900 to-navy-950 lg:h-screen">
+      {/* Soft colour glows behind the glass surfaces */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-32 left-1/4 size-[36rem] rounded-full bg-sky-500/20 blur-3xl" />
+        <div className="absolute right-0 bottom-0 size-[32rem] rounded-full bg-indigo-500/20 blur-3xl" />
+      </div>
       <TopBar documentName={report.document?.filename ?? null} counts={counts} />
-      <div className="grid flex-1 gap-4 p-4 sm:p-6 lg:min-h-0 lg:grid-cols-[22rem_minmax(0,1fr)]">
+      <div className="relative grid flex-1 grid-cols-1 gap-4 p-4 sm:p-6 lg:min-h-0 lg:grid-cols-[22rem_minmax(0,1fr)]">
         <aside className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto" aria-label="Rules and documents">
           <RulesPanel
             rules={rules.rules}

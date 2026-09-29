@@ -79,6 +79,14 @@ describe("RulesPanel", () => {
     expect(props.onCreate).toHaveBeenCalledWith(expect.objectContaining({ type: "llm", enabled: false }));
   });
 
+  it("starts a blank rule on a deterministic type even when the AI type is listed first", async () => {
+    const llmFirst = [...RULE_TYPES].sort((a) => (a.key === "llm" ? -1 : 1));
+    expect(llmFirst[0].key).toBe("llm");
+    setup({ types: llmFirst });
+    await userEvent.click(screen.getByRole("button", { name: "+ New rule" }));
+    expect(within(screen.getByRole("form", { name: "New rule" })).getByLabelText("Type")).not.toHaveValue("llm");
+  });
+
   it("shows the server's validation error and keeps the form open", async () => {
     setup({ onCreate: vi.fn().mockRejectedValue(new Error("Invalid regular expression")) });
     await userEvent.click(screen.getByRole("button", { name: "+ New rule" }));

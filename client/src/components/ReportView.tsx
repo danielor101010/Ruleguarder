@@ -47,7 +47,7 @@ export default function ReportView({ document, violations, checking, checkedAt, 
         </Button>
       </GlassPanel>
 
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <GlassPanel as="article" aria-label="Document" className="min-h-0 p-6 lg:overflow-y-auto">
           <DocumentPane
             blocks={document.blocks}

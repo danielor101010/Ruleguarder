@@ -21,7 +21,8 @@ interface Props {
 /** Schema-driven rule form. Render with a `key` per rule/template so its local state resets. */
 export default function RuleForm({ types, rule, initial, source, onCreate, onUpdate, onDone }: Props) {
   const start = rule ?? initial ?? null;
-  const [typeKey, setTypeKey] = useState(start?.type ?? types[0]?.key ?? "");
+  // A blank new rule starts on a deterministic type, never on the quota-spending AI type
+  const [typeKey, setTypeKey] = useState(start?.type ?? (types.find((t) => !usesAiQuota({ type: t.key })) ?? types[0])?.key ?? "");
   const type = types.find((t) => t.key === typeKey);
   const [name, setName] = useState(start?.name ?? "");
   const [description, setDescription] = useState(start?.description ?? "");
