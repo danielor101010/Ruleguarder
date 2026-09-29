@@ -1,188 +1,101 @@
-import { createElement, useMemo, useRef, useState } from "react";
-import { countBySeverity, hasSpan, segmentText, violationsByBlock, worstSeverity } from "../lib/highlight";
-import { layoutBlocks } from "../lib/layout";
-import { SEVERITIES, type Block, type DocumentFull, type Violation } from "../types";
+import { useMemo } from "react";
+import { useViolationFilters } from "../hooks/useViolationFilters";
+import { useViolationFocus } from "../hooks/useViolationFocus";
+import { violationsByBlock } from "../lib/highlight";
+import type { DocumentFull, Violation } from "../types";
+import DocumentPane from "./DocumentPane";
+import { AiQuotaBadge, Button, GlassPanel } from "./ui";
+import ViolationsPanel from "./ViolationsPanel";
 
 interface Props {
   document: DocumentFull;
   violations: Violation[] | null; // null => not checked yet
   checking: boolean;
   checkedAt: string | null;
+  /** Enabled rules of type `llm`: a check will spend AI quota. */
+  aiRulesEnabled: number;
   onCheck: () => void;
 }
 
-/** Render with a `key` that changes per document/report, so the active selection resets. */
-export default function ReportView({ document, violations, checking, checkedAt, onCheck }: Props) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const blockRefs = useRef(new Map<number, HTMLElement>());
+const NO_VIOLATIONS: Violation[] = [];
 
-  const byBlock = useMemo(() => violationsByBlock(violations ?? []), [violations]);
-
-  function focus(v: Violation) {
-    setActiveId(v.id);
-    if (v.block_id !== null) {
-      blockRefs.current.get(v.block_id)?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }
-
-  const registerBlock = (id: number) => (el: HTMLElement | null) => {
-    if (el) blockRefs.current.set(id, el);
-    else blockRefs.current.delete(id);
-  };
-
-  const counts = countBySeverity(violations ?? []);
+/** Split screen: document with highlights (left) and the violations list (right). Key it per document/report. */
+export default function ReportView({ document, violations, checking, checkedAt, aiRulesEnabled, onCheck }: Props) {
+  const filters = useViolationFilters(violations ?? NO_VIOLATIONS);
+  const focus = useViolationFocus();
+  const byBlock = useMemo(() => violationsByBlock(filters.visible), [filters.visible]);
 
   return (
-    <div className="report">
-      <div className="report-toolbar">
-        <h2 dir="auto">{document.filename}</h2>
-        <div className="grow" />
-        {violations && (
-          <span className="summary">
-            {violations.length === 0 ? (
-              <span className="ok">No violations found ✓</span>
-            ) : (
-              SEVERITIES
-                .map((s) => [s, counts[s] ?? 0] as const)
-                .filter(([, n]) => n > 0)
-                .map(([s, n]) => (
-                  <span key={s} className={`pill sev-${s}`}>
-                    {n} {s}
-                  </span>
-                ))
-            )}
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <GlassPanel className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-base font-semibold text-slate-900" dir="auto" title={document.filename}>
+            {document.filename}
+          </h2>
+          <p className="text-xs text-slate-600">
+            {checkedAt ? `Checked ${new Date(checkedAt).toLocaleString()}` : "Not checked yet"}
+          </p>
+        </div>
+        {aiRulesEnabled > 0 && (
+          <span className="flex items-center gap-2 text-xs text-slate-700">
+            <AiQuotaBadge />
+            {aiRulesEnabled} AI {aiRulesEnabled === 1 ? "rule" : "rules"} enabled
           </span>
         )}
-        {checkedAt && <span className="muted small">Checked {new Date(checkedAt).toLocaleString()}</span>}
-        <button onClick={onCheck} disabled={checking}>
+        <Button onClick={onCheck} disabled={checking}>
           {checking ? "Checking…" : violations ? "Re-check" : "Check document"}
-        </button>
-      </div>
+        </Button>
+      </GlassPanel>
 
-      <div className="report-body">
-        <article className="doc">
-          <DocumentBody
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <GlassPanel as="article" aria-label="Document" className="min-h-0 p-6 lg:overflow-y-auto">
+          <DocumentPane
             blocks={document.blocks}
             byBlock={byBlock}
-            activeId={activeId}
-            onPick={focus}
-            registerBlock={registerBlock}
+            activeId={focus.activeId}
+            flash={focus.flash}
+            onPick={focus.selectFromDocument}
+            registerBlock={focus.registerBlock}
           />
-        </article>
+        </GlassPanel>
 
-        <aside className="violations">
-          <h3>Violations</h3>
-          {checking && <p className="muted">The AI is reading the document… this can take a minute for long documents.</p>}
-          {!checking && violations === null && <p className="muted">Not checked yet. Click “Check document”.</p>}
-          {violations?.map((v) => (
-            <button
-              key={v.id}
-              className={`violation sev-${v.severity} ${v.id === activeId ? "active" : ""}`}
-              onClick={() => focus(v)}
-            >
-              <div className="violation-head">
-                <span className={`dot sev-${v.severity}`} />
-                <strong dir="auto">{v.rule_name}</strong>
-              </div>
-              <div dir="auto">{v.message}</div>
-              {v.excerpt && (
-                <div className="excerpt" dir="auto">
-                  {v.excerpt}
-                </div>
-              )}
-              <div className="muted small" dir="auto">
-                📍 {v.location}
-              </div>
-            </button>
-          ))}
-        </aside>
+        <GlassPanel as="aside" aria-labelledby="violations-heading" className="flex min-h-0 flex-col gap-3 p-5 lg:overflow-y-auto">
+          <h3 id="violations-heading" className="text-base font-semibold text-slate-900">
+            Violations
+            {violations && <span className="ml-2 text-sm font-normal text-slate-600">{violations.length} total</span>}
+          </h3>
+          {checking && (
+            <p role="status" className="text-sm text-slate-600">
+              Checking the document… AI rules can take a minute on long documents.
+            </p>
+          )}
+          {!checking && violations === null && (
+            <p className="text-sm text-slate-600">Not checked yet. Click “Check document”.</p>
+          )}
+          {!checking && violations?.length === 0 && (
+            <p role="status" className="rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 ring-1 ring-emerald-200">
+              No violations found ✓
+            </p>
+          )}
+          {violations && violations.length > 0 && (
+            <ViolationsPanel
+              violations={filters.visible}
+              total={violations.length}
+              severities={filters.severities}
+              counts={filters.counts}
+              onToggleSeverity={filters.toggleSeverity}
+              rules={filters.rules}
+              ruleId={filters.ruleId}
+              onRuleChange={filters.setRuleId}
+              isFiltered={filters.isFiltered}
+              onClearFilters={filters.clear}
+              activeId={focus.activeId}
+              onPick={focus.selectFromList}
+              registerItem={focus.registerItem}
+            />
+          )}
+        </GlassPanel>
       </div>
     </div>
-  );
-}
-
-interface CommonProps {
-  byBlock: Map<number, Violation[]>;
-  activeId: string | null;
-  onPick: (v: Violation) => void;
-  registerBlock: (id: number) => (el: HTMLElement | null) => void;
-}
-
-function DocumentBody({ blocks, ...props }: CommonProps & { blocks: Block[] }) {
-  return (
-    <>
-      {layoutBlocks(blocks).map((item) =>
-        item.kind === "block" ? (
-          <BlockView key={item.block.id} block={item.block} {...props} />
-        ) : (
-          <div key={`t${item.tableIndex}`} className="table-wrap">
-            <table dir="auto">
-              <tbody>
-                {item.cells.map((row, r) => (
-                  <tr key={r}>
-                    {row.map((cellBlocks, c) => (
-                      <td key={c}>
-                        {cellBlocks.map((b) => (
-                          <BlockView key={b.id} block={b} {...props} />
-                        ))}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ),
-      )}
-    </>
-  );
-}
-
-function tooltip(violations: readonly Violation[]): string {
-  return violations.map((v) => `${v.rule_name}: ${v.message}`).join("\n");
-}
-
-function headingTag(block: Block): "p" | "h3" | "h4" | "h5" | "h6" {
-  if (block.kind !== "heading") return "p";
-  const level = Math.min(Math.max(block.heading_level ?? 1, 1) + 2, 6);
-  return `h${level}` as "h3" | "h4" | "h5" | "h6";
-}
-
-function BlockView({ block, byBlock, activeId, onPick, registerBlock }: CommonProps & { block: Block }) {
-  const violations = byBlock.get(block.id) ?? [];
-  // Violations without a span (quote not found) flag the whole block
-  const wholeBlock = violations.filter((v) => !hasSpan(v));
-  const flagged = wholeBlock.length > 0;
-  const blockActive = wholeBlock.some((v) => v.id === activeId);
-  const children = block.text
-    ? segmentText(block.text, violations).map((seg, i) =>
-        seg.violations.length ? (
-          <mark
-            key={i}
-            className={`hl sev-${worstSeverity(seg.violations)} ${seg.violations.some((v) => v.id === activeId) ? "active" : ""}`}
-            title={tooltip(seg.violations)}
-            onClick={(e) => {
-              e.stopPropagation();
-              onPick(seg.violations[0]);
-            }}
-          >
-            {seg.text}
-          </mark>
-        ) : (
-          <span key={i}>{seg.text}</span>
-        ),
-      )
-    : " ";
-
-  return createElement(
-    headingTag(block),
-    {
-      ref: registerBlock(block.id),
-      dir: "auto",
-      className: `block ${flagged ? `flagged sev-${worstSeverity(wholeBlock)}` : ""} ${blockActive ? "active" : ""}`,
-      onClick: flagged ? () => onPick(wholeBlock[0]) : undefined,
-      title: flagged ? tooltip(wholeBlock) : undefined,
-    },
-    children,
   );
 }

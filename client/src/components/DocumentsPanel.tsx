@@ -1,82 +1,95 @@
-import { useRef, useState } from "react";
-import { api } from "../api";
+import { useRef } from "react";
+import { cx } from "../lib/severity";
 import type { DocumentSummary } from "../types";
+import { Button, ErrorNote, GlassPanel } from "./ui";
 
 interface Props {
   documents: DocumentSummary[];
   selectedId: number | null;
-  onSelect: (id: number | null) => void;
-  onChange: () => void;
+  loading: boolean;
+  uploading: boolean;
+  error: string | null;
+  onSelect: (id: number) => void;
+  onUpload: (file: File) => void;
+  onDelete: (doc: DocumentSummary) => void;
 }
 
-export default function DocumentsPanel({ documents, selectedId, onSelect, onChange }: Props) {
+const DOCX_ACCEPT = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+export default function DocumentsPanel({
+  documents,
+  selectedId,
+  loading,
+  uploading,
+  error,
+  onSelect,
+  onUpload,
+  onDelete,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function upload(file: File) {
-    setUploading(true);
-    setError(null);
-    try {
-      const doc = await api.uploadDocument(file);
-      onChange();
-      onSelect(doc.id);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  }
-
-  async function remove(doc: DocumentSummary) {
-    await api.deleteDocument(doc.id);
-    if (doc.id === selectedId) onSelect(null);
-    onChange();
-  }
 
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <h2>Documents</h2>
-        <button onClick={() => inputRef.current?.click()} disabled={uploading}>
+    <GlassPanel className="flex flex-col gap-3 p-5" aria-labelledby="documents-heading">
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="documents-heading" className="text-base font-semibold text-slate-900">
+          Documents
+        </h2>
+        <Button size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
           {uploading ? "Uploading…" : "Upload .docx"}
-        </button>
+        </Button>
         <input
           ref={inputRef}
           type="file"
-          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          accept={DOCX_ACCEPT}
           hidden
-          onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+          aria-label="Upload .docx file"
+          data-testid="upload-input"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) onUpload(file);
+          }}
         />
       </div>
-      {error && <p className="error">{error}</p>}
-      {!documents.length && <p className="muted">No documents uploaded yet.</p>}
-      <ul className="list">
-        {documents.map((doc) => (
-          <li
-            key={doc.id}
-            className={`clickable ${doc.id === selectedId ? "selected" : ""}`}
-            onClick={() => onSelect(doc.id)}
-          >
-            <div className="grow">
-              <div dir="auto">{doc.filename}</div>
-              <div className="muted small">
-                {(doc.size_bytes / 1024).toFixed(0)} KB · {new Date(doc.uploaded_at).toLocaleString()}
-              </div>
-            </div>
-            <button
-              className="link danger"
-              onClick={(e) => {
-                e.stopPropagation();
-                remove(doc);
-              }}
+      {error && <ErrorNote>{error}</ErrorNote>}
+      {loading && <p className="text-sm text-slate-600">Loading documents…</p>}
+      {!loading && !documents.length && <p className="text-sm text-slate-600">No documents uploaded yet.</p>}
+      <ul className="flex flex-col gap-1" aria-label="Documents list">
+        {documents.map((doc) => {
+          const selected = doc.id === selectedId;
+          return (
+            <li
+              key={doc.id}
+              className={cx(
+                "flex items-center gap-2 rounded-2xl pr-2",
+                selected ? "bg-white text-slate-900 shadow-sm ring-2 ring-slate-900" : "text-slate-900 hover:bg-white/60",
+              )}
             >
-              Delete
-            </button>
-          </li>
-        ))}
+              <button
+                type="button"
+                className="min-w-0 flex-1 rounded-2xl px-3 py-2 text-left"
+                aria-current={selected ? "true" : undefined}
+                onClick={() => onSelect(doc.id)}
+              >
+                <span className="block truncate text-sm font-medium" dir="auto" title={doc.filename}>
+                  {doc.filename}
+                </span>
+                <span className="block text-xs text-slate-600">
+                  {(doc.size_bytes / 1024).toFixed(0)} KB · {new Date(doc.uploaded_at).toLocaleString()}
+                </span>
+              </button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => onDelete(doc)}
+                aria-label={`Delete ${doc.filename}`}
+              >
+                Delete
+              </Button>
+            </li>
+          );
+        })}
       </ul>
-    </section>
+    </GlassPanel>
   );
 }

@@ -1,0 +1,25 @@
+# Playwright E2E tests against the running stack (non-LLM rules only).
+#   docker compose -p <project> -f docker-compose.yml -f docker-compose.e2e.yml up -d --build db server client
+#   docker compose -p <project> -f docker-compose.yml -f docker-compose.e2e.yml --profile e2e run --rm e2e
+# The image version must match @playwright/test in client/package.json.
+services:
+  e2e:
+    profiles: ["e2e"]
+    image: mcr.microsoft.com/playwright:v1.63.0-noble
+    working_dir: /work
+    ipc: host
+    init: true
+    environment:
+      E2E_BASE_URL: http://client
+      CI: "1"
+    volumes:
+      - ./client:/work
+      # Linux node_modules, kept apart from the host's
+      - e2e_node_modules:/work/node_modules
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npx playwright test"]
+    depends_on:
+      client:
+        condition: service_started
+
+volumes:
+  e2e_node_modules:

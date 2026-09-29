@@ -1,252 +1,165 @@
-import { useEffect, useState } from "react";
-import { api } from "../api";
-import type { ParamSchema, Rule, RuleInput, RuleType, Severity } from "../types";
+import { useState } from "react";
+import type { SamplesState, TemplatesStatus } from "../hooks/useRuleTemplates";
+import { cx } from "../lib/severity";
+import { draftFromTemplate, usesAiQuota } from "../lib/templates";
+import type { Rule, RuleCreate, RuleTemplate, RuleType, RuleUpdate } from "../types";
+import RuleForm from "./RuleForm";
+import TemplatePicker from "./TemplatePicker";
+import { AiQuotaBadge, Button, ErrorNote, GlassPanel, SeverityDot } from "./ui";
+
+export interface TemplatesView {
+  templates: RuleTemplate[];
+  status: TemplatesStatus;
+  error: string | null;
+  onRetry: () => void;
+}
+
+export interface SamplesView extends SamplesState {
+  onLoad: () => void;
+  onDismiss: () => void;
+}
 
 interface Props {
   rules: Rule[];
-  onChange: () => void;
+  types: RuleType[];
+  loading: boolean;
+  error: string | null;
+  onDismissError: () => void;
+  onCreate: (input: RuleCreate) => Promise<void>;
+  onUpdate: (id: number, changes: RuleUpdate) => Promise<void>;
+  onToggle: (rule: Rule) => void;
+  onDelete: (rule: Rule) => void;
+  templates: TemplatesView;
+  samples: SamplesView;
 }
 
-export default function RulesPanel({ rules, onChange }: Props) {
-  const [types, setTypes] = useState<RuleType[]>([]);
-  const [editing, setEditing] = useState<Rule | "new" | null>(null);
-  const [error, setError] = useState<string | null>(null);
+type Editing =
+  | { kind: "new"; initial: RuleCreate | null; source: string | null }
+  | { kind: "edit"; rule: Rule };
 
-  useEffect(() => {
-    api.ruleTypes().then(setTypes).catch((e) => setError(e.message));
-  }, []);
+export default function RulesPanel({
+  rules,
+  types,
+  loading,
+  error,
+  onDismissError,
+  onCreate,
+  onUpdate,
+  onToggle,
+  onDelete,
+  templates,
+  samples,
+}: Props) {
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const [formKey, setFormKey] = useState(0);
+
+  /** A new key per opening, so the form state resets when another template or rule is picked. */
+  function open(next: Editing) {
+    setEditing(next);
+    setFormKey((k) => k + 1);
+  }
 
   const typeLabel = (key: string) => types.find((t) => t.key === key)?.label ?? key;
-
-  async function toggle(rule: Rule) {
-    await api.updateRule(rule.id, { enabled: !rule.enabled });
-    onChange();
-  }
-
-  async function remove(rule: Rule) {
-    await api.deleteRule(rule.id);
-    onChange();
-  }
+  const templatesAvailable = templates.status !== "unavailable";
 
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <h2>Rules</h2>
-        <button onClick={() => setEditing("new")} disabled={!types.length}>
+    <GlassPanel className="flex flex-col gap-3 p-5" aria-labelledby="rules-heading">
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="rules-heading" className="text-base font-semibold text-slate-900">
+          Rules
+        </h2>
+        <Button size="sm" onClick={() => open({ kind: "new", initial: null, source: null })} disabled={!types.length}>
           + New rule
-        </button>
+        </Button>
       </div>
-      {error && <p className="error">{error}</p>}
+
+      <div className="flex flex-wrap items-start gap-2">
+        <TemplatePicker
+          templates={templates.templates}
+          status={templates.status}
+          error={templates.error}
+          onRetry={templates.onRetry}
+          onPick={(t) => open({ kind: "new", initial: draftFromTemplate(t), source: t.label })}
+        />
+        {templatesAvailable && (
+          <Button variant="secondary" size="sm" onClick={samples.onLoad} disabled={samples.loading}>
+            {samples.loading ? "Loading samples…" : "Load Sample Rules"}
+          </Button>
+        )}
+      </div>
+      {!templatesAvailable && (
+        <p className="text-xs text-slate-600">Rule templates and sample rules are not available on this server.</p>
+      )}
+      {samples.message && (
+        <p role="status" className="flex items-center justify-between rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
+          Sample rules: {samples.message}
+          <button type="button" className="rounded-full px-1.5 hover:bg-emerald-100" aria-label="Dismiss" onClick={samples.onDismiss}>
+            ×
+          </button>
+        </p>
+      )}
+      {samples.error && <ErrorNote onDismiss={samples.onDismiss}>{samples.error}</ErrorNote>}
+      {error && <ErrorNote onDismiss={onDismissError}>{error}</ErrorNote>}
 
       {editing && (
         <RuleForm
+          key={formKey}
           types={types}
-          rule={editing === "new" ? null : editing}
-          onCancel={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            onChange();
-          }}
+          rule={editing.kind === "edit" ? editing.rule : null}
+          initial={editing.kind === "new" ? editing.initial : null}
+          source={editing.kind === "new" ? editing.source : null}
+          onCreate={onCreate}
+          onUpdate={onUpdate}
+          onDone={() => setEditing(null)}
         />
       )}
 
-      {!rules.length && !editing && <p className="muted">No rules yet. Create one to start checking documents.</p>}
-      <ul className="list">
+      {loading && <p className="text-sm text-slate-600">Loading rules…</p>}
+      {!loading && !rules.length && !editing && (
+        <p className="text-sm text-slate-600">No rules yet. Create one, pick a template, or load the sample rules.</p>
+      )}
+      <ul className="flex flex-col gap-1" aria-label="Rules list">
         {rules.map((rule) => (
-          <li key={rule.id} className={rule.enabled ? "" : "disabled"}>
-            <label className="rule-toggle" title={rule.enabled ? "Enabled" : "Disabled"}>
-              <input type="checkbox" checked={rule.enabled} onChange={() => toggle(rule)} />
-            </label>
-            <div className="grow">
-              <div className="rule-name" dir="auto">
-                <span className={`dot sev-${rule.severity}`} /> {rule.name}
+          <li key={rule.id} className="flex items-start gap-3 rounded-2xl px-2 py-2 hover:bg-white/60">
+            <input
+              type="checkbox"
+              role="switch"
+              className="mt-0.5 size-4 shrink-0 accent-slate-900"
+              checked={rule.enabled}
+              onChange={() => onToggle(rule)}
+              aria-label={`Enable ${rule.name}`}
+            />
+            <div className="min-w-0 flex-1">
+              <div
+                className={cx(
+                  "flex items-center gap-2 text-sm font-medium",
+                  rule.enabled ? "text-slate-900" : "text-slate-500",
+                )}
+              >
+                <SeverityDot severity={rule.severity} />
+                <span className="line-clamp-2 break-words" dir="auto" title={rule.name}>
+                  {rule.name}
+                </span>
+                {!rule.enabled && <span className="shrink-0 text-xs font-normal text-slate-600">(off)</span>}
               </div>
-              <div className="muted small" dir="auto">
+              <div className="truncate text-xs text-slate-600" dir="auto">
                 {typeLabel(rule.type)}
-                {rule.type === "llm" && typeof rule.params.instruction === "string" && ` · ${rule.params.instruction}`}
+                {usesAiQuota(rule) && typeof rule.params.instruction === "string" && ` · ${rule.params.instruction}`}
+              </div>
+              <div className="mt-1 flex items-center gap-1">
+                {usesAiQuota(rule) && <AiQuotaBadge />}
+                <span className="flex-1" />
+                <Button variant="ghost" size="sm" onClick={() => open({ kind: "edit", rule })} aria-label={`Edit ${rule.name}`}>
+                  Edit
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => onDelete(rule)} aria-label={`Delete ${rule.name}`}>
+                  Delete
+                </Button>
               </div>
             </div>
-            <button className="link" onClick={() => setEditing(rule)}>
-              Edit
-            </button>
-            <button className="link danger" onClick={() => remove(rule)}>
-              Delete
-            </button>
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-
-function defaultsFor(type: RuleType | undefined): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [name, schema] of Object.entries(type?.params_schema.properties ?? {})) {
-    out[name] = schema.default ?? (schema.type === "boolean" ? false : schema.type === "array" ? [] : "");
-  }
-  return out;
-}
-
-function RuleForm({
-  types,
-  rule,
-  onCancel,
-  onSaved,
-}: {
-  types: RuleType[];
-  rule: Rule | null;
-  onCancel: () => void;
-  onSaved: () => void;
-}) {
-  const [typeKey, setTypeKey] = useState(rule?.type ?? types[0]?.key ?? "");
-  const type = types.find((t) => t.key === typeKey);
-  const [name, setName] = useState(rule?.name ?? "");
-  const [severity, setSeverity] = useState<Severity>(rule?.severity ?? "high");
-  const [params, setParams] = useState<Record<string, unknown>>(rule?.params ?? defaultsFor(type));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  function changeType(key: string) {
-    setTypeKey(key);
-    setParams(defaultsFor(types.find((t) => t.key === key)));
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      if (rule) {
-        await api.updateRule(rule.id, { name, severity, params });
-      } else {
-        const input: RuleInput = { name, description: "", type: typeKey, params, severity, enabled: true };
-        await api.createRule(input);
-      }
-      onSaved();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form className="card rule-form" onSubmit={submit}>
-      <label>
-        Type
-        <select value={typeKey} onChange={(e) => changeType(e.target.value)} disabled={!!rule}>
-          {types.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {type && <p className="muted small">{type.description}</p>}
-
-      <label>
-        Name
-        <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} required />
-      </label>
-
-      {Object.entries(type?.params_schema.properties ?? {}).map(([key, schema]) => (
-        <ParamField
-          key={key}
-          name={key}
-          schema={schema}
-          required={type?.params_schema.required?.includes(key) ?? false}
-          value={params[key]}
-          onChange={(v) => setParams((p) => ({ ...p, [key]: v }))}
-        />
-      ))}
-
-      <label>
-        Severity
-        <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity)}>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-      </label>
-
-      {error && <p className="error">{error}</p>}
-      <div className="row">
-        <button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save"}
-        </button>
-        <button type="button" className="secondary" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function ParamField({
-  name,
-  schema,
-  required,
-  value,
-  onChange,
-}: {
-  name: string;
-  schema: ParamSchema;
-  required: boolean;
-  value: unknown;
-  onChange: (v: unknown) => void;
-}) {
-  const label = schema.title ?? name;
-
-  if (schema.type === "boolean") {
-    return (
-      <label className="checkbox">
-        <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
-        {label}
-      </label>
-    );
-  }
-
-  let input: React.ReactNode;
-  if (schema.type === "array") {
-    input = (
-      <input
-        dir="auto"
-        value={Array.isArray(value) ? value.join(", ") : ""}
-        placeholder="Comma separated"
-        onChange={(e) =>
-          onChange(
-            e.target.value
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
-          )
-        }
-        required={required}
-      />
-    );
-  } else if (schema.type === "integer" || schema.type === "number") {
-    input = (
-      <input
-        type="number"
-        step={schema.type === "integer" ? 1 : "any"}
-        value={value === undefined || value === null ? "" : String(value)}
-        onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-        required={required}
-      />
-    );
-  } else if (schema.format === "textarea") {
-    input = (
-      <textarea dir="auto" rows={4} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} required={required} />
-    );
-  } else {
-    input = <input dir="auto" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} required={required} />;
-  }
-
-  return (
-    <label>
-      {label}
-      {input}
-      {schema.description && <span className="muted small">{schema.description}</span>}
-    </label>
+    </GlassPanel>
   );
 }
