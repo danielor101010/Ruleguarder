@@ -47,3 +47,20 @@ def build_sample_docx(path: Path) -> Path:
 
     doc.save(str(path))
     return path
+
+
+REFERENCES = "See Section 2 and Section 3, Figure 1 and Figure 2, Table 1 and Table 2."
+
+
+def build_references_docx(path: Path) -> Path:
+    """Headings without typed numbers (Word numbers them), one captioned figure and one table."""
+    doc = Document()
+    doc.add_heading("Design Report", level=0)
+    doc.add_heading("Introduction", level=1)
+    doc.add_paragraph(REFERENCES)
+    doc.add_heading("Design", level=1)
+    doc.add_paragraph("Figure 1: Block diagram", style="Caption")
+    table = doc.add_table(rows=1, cols=1)
+    table.cell(0, 0).text = "Range"
+    doc.save(str(path))
+    return path

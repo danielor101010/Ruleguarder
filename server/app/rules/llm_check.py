@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from ..config import get_settings
 from ..llm import LlmBlock, LlmProvider, LlmRule
 from ..schemas import Block
-from .registry import Finding
+from .finding import Finding
 
 # Characters the model may silently swap (Hebrew gershayim/geresh vs ASCII quotes, dashes, NBSP...)
 _EQUIVALENT = str.maketrans(

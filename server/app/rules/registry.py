@@ -5,9 +5,9 @@ The main rule type is "llm": a natural-language instruction that the LLM checks
 The other types are deterministic, free and exact - use them for formatting rules
 (fonts, sizes) that an LLM cannot see, or for plain forbidden words.
 
-To add a new deterministic type: define a params model + a checker function, then
-register it in RULE_TYPES. The client builds its form from the params JSON schema,
-so no client change is needed.
+To add a new deterministic type: define a params model + a checker function (here, or in
+its own module when it is larger, like pii.py), then register it in RULE_TYPES. The client
+builds its form from the params JSON schema, so no client change is needed.
 """
 
 import re
@@ -18,15 +18,10 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from ..schemas import Block, Run
-
-
-@dataclass
-class Finding:
-    message: str
-    block_id: int | None = None
-    start: int | None = None
-    end: int | None = None
-
+from .acronyms import AcronymParams, check_acronym_definitions
+from .cross_references import CrossReferenceParams, check_cross_references
+from .finding import Finding
+from .pii import PiiParams, check_pii
 
 # Each checker takes its own params model; the registry pairs them via RuleType.params_model
 Checker = Callable[[Any, list[Block]], Iterable[Finding]]
@@ -232,6 +227,28 @@ RULE_TYPES: dict[str, RuleType] = {
             "Flags text whose font size is outside the range.",
             FontSizeRangeParams,
             _check_font_size_range,
+        ),
+        RuleType(
+            "pii",
+            "Personal data (PII)",
+            "Flags social security numbers, phone numbers, email addresses and credit card "
+            "numbers. The report shows them masked.",
+            PiiParams,
+            check_pii,
+        ),
+        RuleType(
+            "acronym_definitions",
+            "Acronym definitions",
+            'Every acronym must be defined at its first use, as "Full Name (ABC)" or "ABC (Full Name)".',
+            AcronymParams,
+            check_acronym_definitions,
+        ),
+        RuleType(
+            "cross_references",
+            "Cross-references",
+            'Flags references such as "Section 3.2", "Figure 4" or "Table 2" whose target does not exist.',
+            CrossReferenceParams,
+            check_cross_references,
         ),
     ]
 }

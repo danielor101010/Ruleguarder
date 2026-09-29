@@ -74,6 +74,68 @@ def test_rule_types_exposed(api):
     assert "instruction" in types["llm"]["params_schema"]["properties"]
 
 
+def test_new_rule_types_exposed(api):
+    types = {t["key"]: t for t in api.get("/api/rules/types").json()}
+    assert types["pii"]["params_schema"]["properties"]["categories"]["items"]["enum"] == [
+        "ssn",
+        "phone",
+        "email",
+        "credit_card",
+    ]
+    assert {"min_length", "max_length", "ignore"} <= set(types["acronym_definitions"]["params_schema"]["properties"])
+    assert "kinds" in types["cross_references"]["params_schema"]["properties"]
+
+
+def test_rule_templates(api):
+    res = api.get("/api/rules/templates")
+    assert res.status_code == 200, res.text  # not shadowed by the /{rule_id} routes
+    templates = {t["id"]: t for t in res.json()}
+    assert {"pii-all", "acronym-definitions", "cross-references", "ai-no-performance-figures"} <= set(templates)
+    for t in templates.values():
+        assert t["category"] in {"security", "privacy", "style", "structure", "ai"}
+        assert {"name", "description", "type", "params", "severity", "enabled"} <= set(t["rule"])
+    assert templates["ai-no-performance-figures"]["rule"]["enabled"] is False
+
+
+def test_template_rule_can_be_posted(api, created):
+    template = next(t for t in api.get("/api/rules/templates").json() if t["id"] == "cross-references")
+    rule = create_rule(api, created, **{**template["rule"], "name": "cross-references from template (e2e)"})
+    assert rule["type"] == "cross_references"
+
+
+def test_sample_rules_are_idempotent(api, created, sample_docx):
+    sample_names = {t["rule"]["name"] for t in api.get("/api/rules/templates").json() if t["in_sample_set"]}
+
+    first = api.post("/api/rules/samples")
+    assert first.status_code == 201, first.text
+    body = first.json()
+    created["rules"].extend(r["id"] for r in body["created"])  # only what this test created is removed
+    assert {r["name"] for r in body["created"]} | set(body["skipped"]) == sample_names
+
+    rules = {r["name"]: r for r in api.get("/api/rules").json() if r["name"] in sample_names}
+    assert set(rules) == sample_names
+    ai = [r for r in rules.values() if r["type"] == "llm"]
+    assert len(ai) == 1
+    if ai[0]["id"] in created["rules"]:
+        assert ai[0]["enabled"] is False  # a pre-existing rule may have been enabled by the user
+
+    again = api.post("/api/rules/samples")
+    assert again.status_code == 201, again.text
+    assert again.json()["created"] == []
+    assert set(again.json()["skipped"]) == sample_names
+    assert len([r for r in api.get("/api/rules").json() if r["name"] in sample_names]) == len(sample_names)
+
+    # The deterministic sample rules this test created run on a real upload (never the AI rule: no LLM calls).
+    # Only the classification marking fires on the sample document.
+    fresh = [r for r in body["created"] if r["type"] != "llm"]
+    if not fresh:
+        return
+    doc = upload(api, created, sample_docx)
+    report = check(api, doc["id"], [r["id"] for r in fresh])
+    expected = ["TOP SECRET"] if any(r["name"] == "No classification markings" for r in fresh) else []
+    assert [highlighted(report, v) for v in report["violations"]] == expected
+
+
 def test_invalid_rule_rejected(api):
     res = api.post(
         "/api/rules", json={"name": "bad", "type": "forbidden_text", "params": {"pattern": "(", "is_regex": True}}
