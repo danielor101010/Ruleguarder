@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 const SPAN = violation({ id: "1-0", rule_name: "No figures", message: "Reveals range", block_id: 1, start: 23, end: 28 });
-const WHOLE = violation({ id: "2-0", rule_name: "Cell rule", message: "Bad cell", block_id: 3 }, "warning");
+const WHOLE = violation({ id: "2-0", rule_name: "Cell rule", message: "Bad cell", block_id: 3 }, "medium");
 const DOC_LEVEL = violation({ id: "3-0", rule_name: "Banner", message: "Missing banner", block_id: null, location: "Whole document" });
 
 function setup(violations = [SPAN, WHOLE, DOC_LEVEL]) {
@@ -26,14 +26,14 @@ describe("ReportView", () => {
     setup();
     const mark = screen.getByText("50 km");
     expect(mark.tagName).toBe("MARK");
-    expect(mark).toHaveClass("sev-error");
+    expect(mark).toHaveClass("sev-high");
     expect(mark).toHaveAttribute("title", "No figures: Reveals range");
   });
 
   it("flags the whole block when there is no span, inside the table", () => {
     setup();
     const cell = screen.getByText("2 seconds").closest("p");
-    expect(cell).toHaveClass("flagged", "sev-warning");
+    expect(cell).toHaveClass("flagged", "sev-medium");
     expect(cell?.closest("td")).not.toBeNull();
   });
 
@@ -60,8 +60,8 @@ describe("ReportView", () => {
   it("shows severity counts and runs a re-check", async () => {
     const { onCheck } = setup();
     const toolbar = screen.getByRole("heading", { name: "spec.docx" }).parentElement as HTMLElement;
-    expect(within(toolbar).getByText("2 errors")).toBeInTheDocument();
-    expect(within(toolbar).getByText("1 warning")).toBeInTheDocument();
+    expect(within(toolbar).getByText("2 high")).toBeInTheDocument();
+    expect(within(toolbar).getByText("1 medium")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Re-check" }));
     expect(onCheck).toHaveBeenCalledOnce();
   });

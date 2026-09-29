@@ -18,7 +18,7 @@ export function block(overrides: Partial<Block> & Pick<Block, "id" | "text">): B
 
 export function violation(
   overrides: Partial<Violation> & Pick<Violation, "id">,
-  severity: Severity = "error",
+  severity: Severity = "high",
 ): Violation {
   return {
     rule_id: 1,

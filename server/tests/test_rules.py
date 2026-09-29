@@ -7,7 +7,7 @@ from .conftest import block_containing
 from .sample_doc import INTRO, LONG_SENTENCE, WRONG_FONT
 
 
-def make_rule(rule_id: int, type_: str, params: dict, severity: str = "error") -> Rule:
+def make_rule(rule_id: int, type_: str, params: dict, severity: str = "high") -> Rule:
     return Rule(
         id=rule_id,
         name=f"rule {rule_id}",
@@ -64,11 +64,11 @@ def test_font_size_range(sample_blocks):
 
 def test_severity_summary(sample_blocks):
     rules = [
-        make_rule(1, "forbidden_text", {"pattern": "secret"}, "error"),
-        make_rule(2, "forbidden_text", {"pattern": "radar"}, "warning"),
+        make_rule(1, "forbidden_text", {"pattern": "secret"}, "high"),
+        make_rule(2, "forbidden_text", {"pattern": "radar"}, "medium"),
     ]
     _, summary = run_rules(rules, sample_blocks, None)
-    assert summary.by_severity == {"error": 1, "warning": 1}
+    assert summary.by_severity == {"high": 1, "medium": 1}
     assert summary.rules_checked == 2
 
 

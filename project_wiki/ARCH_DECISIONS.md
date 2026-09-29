@@ -65,3 +65,8 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - No `setState` inside effects: selection resets happen during render (hook) or through a React `key` (`ReportView`).
 
 **Consequences.** jsdom is pinned to 25 because jsdom 26+ needs Node ≥ 24.15 (local Node is 24.11). One npm deprecation warning remains from a transitive jsdom dependency (`whatwg-encoding`), which is not our code.
+
+## ADR-010 – Severity levels high / medium / low (Accepted, 2026-09-29)
+**Context.** The product owner wants High = red, Medium = orange, Low = yellow. The API used error / warning / info.
+**Decision.** `Severity = Literal["low", "medium", "high"]` with a Pydantic `BeforeValidator` that maps the legacy names (error→high, warning→medium, info→low). Stored reports are therefore upgraded on read, and `ReportSummary.by_severity` keys are merged. Stored rules are rewritten once at startup by `app/migrations.py::upgrade_legacy_severities` (idempotent). The default severity is `high`.
+**Consequences.** Old clients sending legacy names keep working. Colours: high `#dc2626`, medium `#ea580c`, low `#a16207` (yellow-700, chosen for text contrast on light backgrounds).

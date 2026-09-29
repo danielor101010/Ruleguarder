@@ -1,4 +1,6 @@
-export type Severity = "info" | "warning" | "error";
+export type Severity = "low" | "medium" | "high";
+
+export const SEVERITIES: readonly Severity[] = ["high", "medium", "low"];
 
 export interface Run {
   start: number;

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import models  # noqa: F401  (registers tables on Base.metadata)
 from .config import get_settings
 from .db import Base, engine
+from .migrations import upgrade_legacy_severities
 from .routers import documents, rules
 
 settings = get_settings()
@@ -18,6 +19,7 @@ logging.basicConfig(level=settings.log_level.upper())
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # TODO: replace with Alembic migrations once the schema settles
     Base.metadata.create_all(engine)
+    upgrade_legacy_severities(engine)
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     yield
 

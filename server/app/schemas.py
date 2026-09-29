@@ -1,9 +1,17 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
-Severity = Literal["info", "warning", "error"]
+# Names used before the high/medium/low rename; old rules and stored reports still load.
+LEGACY_SEVERITY = {"error": "high", "warning": "medium", "info": "low"}
+
+
+def _upgrade_severity(value: Any) -> Any:
+    return LEGACY_SEVERITY.get(value, value) if isinstance(value, str) else value
+
+
+Severity = Annotated[Literal["low", "medium", "high"], BeforeValidator(_upgrade_severity)]
 BlockKind = Literal["paragraph", "heading", "table_cell"]
 
 
@@ -47,7 +55,7 @@ class RuleBase(BaseModel):
     description: str = ""
     type: str
     params: dict[str, Any] = {}
-    severity: Severity = "error"
+    severity: Severity = "high"
     enabled: bool = True
 
 
@@ -115,6 +123,17 @@ class ReportSummary(BaseModel):
     total: int
     by_severity: dict[str, int]
     rules_checked: int
+
+    @field_validator("by_severity", mode="before")
+    @classmethod
+    def _upgrade_keys(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        upgraded: dict[str, int] = {}
+        for key, count in value.items():
+            new_key = LEGACY_SEVERITY.get(str(key), str(key))
+            upgraded[new_key] = upgraded.get(new_key, 0) + count
+        return upgraded
 
 
 class ReportOut(BaseModel):

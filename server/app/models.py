@@ -15,7 +15,7 @@ class Rule(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     type: Mapped[str] = mapped_column(String(50))
     params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    severity: Mapped[str] = mapped_column(String(20), default="error")
+    severity: Mapped[str] = mapped_column(String(20), default="high")
     enabled: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

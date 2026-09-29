@@ -39,15 +39,15 @@ describe("segmentText", () => {
 });
 
 describe("worstSeverity / countBySeverity", () => {
-  const list = [violation({ id: "1" }, "info"), violation({ id: "2" }, "error"), violation({ id: "3" }, "warning")];
+  const list = [violation({ id: "1" }, "low"), violation({ id: "2" }, "high"), violation({ id: "3" }, "medium")];
 
   it("picks the most severe", () => {
-    expect(worstSeverity(list)).toBe("error");
-    expect(worstSeverity([])).toBe("info");
+    expect(worstSeverity(list)).toBe("high");
+    expect(worstSeverity([])).toBe("low");
   });
 
   it("counts per severity", () => {
-    expect(countBySeverity(list)).toEqual({ info: 1, error: 1, warning: 1 });
+    expect(countBySeverity(list)).toEqual({ low: 1, high: 1, medium: 1 });
   });
 });
 

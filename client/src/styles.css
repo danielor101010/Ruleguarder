@@ -5,12 +5,14 @@
   --text: #1c2129;
   --muted: #6b7380;
   --accent: #2f5bea;
-  --error: #d63b3b;
-  --error-bg: #fde8e8;
-  --warning: #c98a00;
-  --warning-bg: #fff4d1;
-  --info: #2f7fd6;
-  --info-bg: #e3effc;
+  --danger: #d63b3b;
+  --danger-bg: #fde8e8;
+  --high: #dc2626;
+  --high-bg: #fee2e2;
+  --medium: #ea580c;
+  --medium-bg: #ffedd5;
+  --low: #a16207;
+  --low-bg: #fef9c3;
   font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -32,7 +34,7 @@ button {
 button:disabled { opacity: 0.6; cursor: default; }
 button.secondary { background: transparent; color: var(--accent); }
 button.link { background: none; border: none; color: var(--accent); padding: 2px 4px; }
-button.link.danger { color: var(--error); }
+button.link.danger { color: var(--danger); }
 
 input, select, textarea {
   font: inherit;
@@ -47,8 +49,8 @@ input, select, textarea {
 .small { font-size: 0.82rem; }
 .grow { flex: 1; min-width: 0; }
 .row { display: flex; gap: 8px; }
-.error { color: var(--error); }
-.error.banner { background: var(--error-bg); padding: 8px 12px; border-radius: 6px; }
+.error { color: var(--danger); }
+.error.banner { background: var(--danger-bg); padding: 8px 12px; border-radius: 6px; }
 .ok { color: #1f8a4c; font-weight: 600; }
 
 .app { display: flex; flex-direction: column; height: 100vh; }
@@ -80,14 +82,14 @@ input, select, textarea {
 .rule-form label.checkbox input { width: auto; }
 
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
-.dot.sev-error { background: var(--error); }
-.dot.sev-warning { background: var(--warning); }
-.dot.sev-info { background: var(--info); }
+.dot.sev-high { background: var(--high); }
+.dot.sev-medium { background: var(--medium); }
+.dot.sev-low { background: var(--low); }
 
 .pill { padding: 2px 8px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; margin-inline-start: 4px; }
-.pill.sev-error { background: var(--error-bg); color: var(--error); }
-.pill.sev-warning { background: var(--warning-bg); color: var(--warning); }
-.pill.sev-info { background: var(--info-bg); color: var(--info); }
+.pill.sev-high { background: var(--high-bg); color: var(--high); }
+.pill.sev-medium { background: var(--medium-bg); color: var(--medium); }
+.pill.sev-low { background: var(--low-bg); color: var(--low); }
 
 .report { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .report-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -107,15 +109,15 @@ input, select, textarea {
 }
 .block { margin: 0 0 0.8em; border-radius: 4px; }
 .block.flagged { cursor: pointer; outline: 2px dashed transparent; outline-offset: 3px; }
-.block.flagged.sev-error { background: var(--error-bg); outline-color: var(--error); }
-.block.flagged.sev-warning { background: var(--warning-bg); outline-color: var(--warning); }
-.block.flagged.sev-info { background: var(--info-bg); outline-color: var(--info); }
+.block.flagged.sev-high { background: var(--high-bg); outline-color: var(--high); }
+.block.flagged.sev-medium { background: var(--medium-bg); outline-color: var(--medium); }
+.block.flagged.sev-low { background: var(--low-bg); outline-color: var(--low); }
 .block.active { outline-style: solid; }
 
 mark.hl { cursor: pointer; border-radius: 3px; padding: 1px 0; color: inherit; }
-mark.hl.sev-error { background: var(--error-bg); border-bottom: 2px solid var(--error); }
-mark.hl.sev-warning { background: var(--warning-bg); border-bottom: 2px solid var(--warning); }
-mark.hl.sev-info { background: var(--info-bg); border-bottom: 2px solid var(--info); }
+mark.hl.sev-high { background: var(--high-bg); border-bottom: 2px solid var(--high); }
+mark.hl.sev-medium { background: var(--medium-bg); border-bottom: 2px solid var(--medium); }
+mark.hl.sev-low { background: var(--low-bg); border-bottom: 2px solid var(--low); }
 mark.hl.active { outline: 2px solid currentColor; box-shadow: 0 0 0 3px rgba(47, 91, 234, 0.25); }
 
 .table-wrap { overflow-x: auto; margin: 0 0 1em; }
@@ -137,9 +139,9 @@ mark.hl.active { outline: 2px solid currentColor; box-shadow: 0 0 0 3px rgba(47,
   border-radius: 6px;
   padding: 10px 12px;
 }
-.violation.sev-error { border-inline-start-color: var(--error); }
-.violation.sev-warning { border-inline-start-color: var(--warning); }
-.violation.sev-info { border-inline-start-color: var(--info); }
+.violation.sev-high { border-inline-start-color: var(--high); }
+.violation.sev-medium { border-inline-start-color: var(--medium); }
+.violation.sev-low { border-inline-start-color: var(--low); }
 .violation.active { box-shadow: 0 0 0 2px var(--accent); }
 .violation-head { display: flex; align-items: center; gap: 6px; }
 .excerpt { font-size: 0.85rem; background: var(--bg); padding: 4px 6px; border-radius: 4px; }

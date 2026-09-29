@@ -1,7 +1,7 @@
 import { createElement, useMemo, useRef, useState } from "react";
 import { countBySeverity, hasSpan, segmentText, violationsByBlock, worstSeverity } from "../lib/highlight";
 import { layoutBlocks } from "../lib/layout";
-import type { Block, DocumentFull, Severity, Violation } from "../types";
+import { SEVERITIES, type Block, type DocumentFull, type Violation } from "../types";
 
 interface Props {
   document: DocumentFull;
@@ -42,13 +42,12 @@ export default function ReportView({ document, violations, checking, checkedAt, 
             {violations.length === 0 ? (
               <span className="ok">No violations found ✓</span>
             ) : (
-              (["error", "warning", "info"] as Severity[])
+              SEVERITIES
                 .map((s) => [s, counts[s] ?? 0] as const)
                 .filter(([, n]) => n > 0)
                 .map(([s, n]) => (
                   <span key={s} className={`pill sev-${s}`}>
                     {n} {s}
-                    {n > 1 ? "s" : ""}
                   </span>
                 ))
             )}

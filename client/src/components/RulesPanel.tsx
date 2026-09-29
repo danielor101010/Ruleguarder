@@ -101,7 +101,7 @@ function RuleForm({
   const [typeKey, setTypeKey] = useState(rule?.type ?? types[0]?.key ?? "");
   const type = types.find((t) => t.key === typeKey);
   const [name, setName] = useState(rule?.name ?? "");
-  const [severity, setSeverity] = useState<Severity>(rule?.severity ?? "error");
+  const [severity, setSeverity] = useState<Severity>(rule?.severity ?? "high");
   const [params, setParams] = useState<Record<string, unknown>>(rule?.params ?? defaultsFor(type));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -163,9 +163,9 @@ function RuleForm({
       <label>
         Severity
         <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity)}>
-          <option value="error">Error</option>
-          <option value="warning">Warning</option>
-          <option value="info">Info</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
         </select>
       </label>
 

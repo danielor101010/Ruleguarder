@@ -3,10 +3,15 @@
 Newest first. Branch chain so far (nothing merged into `dev` / `main` yet):
 
 ```
-dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-tests → fix/gemini-overload-fallback → feature/quality-gates
+dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-tests → fix/gemini-overload-fallback → feature/quality-gates → refactor/severity-levels
 ```
 
 ---
+
+## 2026-09-29 – `refactor/severity-levels`
+- error / warning / info → **high / medium / low** across API, DB, client and CSS (red / orange / yellow). See ADR-010.
+- Legacy values accepted on input and upgraded on read; stored rules upgraded at startup (idempotent, verified against Postgres).
+- **Tests:** server 58 passed (+8: legacy mapping, rejection of unknown values, default, summary key merge, SQLite migration incl. idempotency); client 32 passed.
 
 ## 2026-09-29 – `feature/quality-gates`
 - **Server:** Ruff + strict mypy added; 8 lint and 31 type findings fixed. The rule registry is now typed per params model. `zip(strict=True)` in LLM result merging. Explicit `bool` in style resolution.
@@ -58,5 +63,4 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 ## Open items
 - Real-LLM E2E rerun on `gemini-3.5-flash` (needs product-owner OK, since it spends quota).
 - UI redesign: the wiki's design system (glassmorphism, Tailwind) vs the earlier request (slate / dark navy dashboard). Needs a decision.
-- Severity rename to High / Medium / Low.
 - Rule templates: PII regex, acronym definitions, cross-references.

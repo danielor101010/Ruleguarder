@@ -43,7 +43,7 @@ def created(api):
 
 
 def create_rule(api, created, **body) -> dict:
-    res = api.post("/api/rules", json={"severity": "error", **body})
+    res = api.post("/api/rules", json={"severity": "high", **body})
     assert res.status_code == 201, res.text
     created["rules"].append(res.json()["id"])
     return res.json()
@@ -91,7 +91,7 @@ def test_full_flow_with_deterministic_rules(api, created, sample_docx):
         api, created, name="No classification markings", type="forbidden_text", params={"pattern": "top secret"}
     )
     fonts = create_rule(
-        api, created, name="Calibri only", type="allowed_fonts", params={"fonts": ["Calibri"]}, severity="warning"
+        api, created, name="Calibri only", type="allowed_fonts", params={"fonts": ["Calibri"]}, severity="medium"
     )
 
     doc = upload(api, created, sample_docx)

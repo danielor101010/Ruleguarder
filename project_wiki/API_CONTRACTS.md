@@ -38,14 +38,14 @@ Errors: `{"detail": "<message>"}` with the HTTP status below.
 ## Models
 
 ```ts
-type Severity = "info" | "warning" | "error";          // planned: "low" | "medium" | "high"
+type Severity = "low" | "medium" | "high";   // legacy input "info" | "warning" | "error" is accepted and mapped
 
 interface RuleCreate {
   name: string;               // 1..200
   description?: string;
   type: string;               // key from /api/rules/types
   params: Record<string, unknown>;   // validated against the type's params schema
-  severity?: Severity;        // default "error"
+  severity?: Severity;        // default "high"
   enabled?: boolean;          // default true
 }
 type RuleUpdate = Partial<Pick<RuleCreate, "name" | "description" | "params" | "severity" | "enabled">>;

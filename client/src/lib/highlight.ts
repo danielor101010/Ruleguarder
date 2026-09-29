@@ -1,6 +1,6 @@
 import type { Severity, Violation } from "../types";
 
-export const SEVERITY_RANK: Record<Severity, number> = { info: 0, warning: 1, error: 2 };
+export const SEVERITY_RANK: Record<Severity, number> = { low: 0, medium: 1, high: 2 };
 
 /** A violation that points at a character range inside its block. */
 export type SpanViolation = Violation & { start: number; end: number };
@@ -17,7 +17,7 @@ export function hasSpan(v: Violation): v is SpanViolation {
 export function worstSeverity(violations: readonly Violation[]): Severity {
   return violations.reduce<Severity>(
     (worst, v) => (SEVERITY_RANK[v.severity] > SEVERITY_RANK[worst] ? v.severity : worst),
-    "info",
+    "low",
   );
 }
 
