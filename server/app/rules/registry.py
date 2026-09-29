@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from ..schemas import Block, Run
 from .acronyms import AcronymParams, check_acronym_definitions
+from .cross_references import CrossReferenceParams, check_cross_references
 from .finding import Finding
 from .pii import PiiParams, check_pii
 
@@ -241,6 +242,13 @@ RULE_TYPES: dict[str, RuleType] = {
             'Every acronym must be defined at its first use, as "Full Name (ABC)" or "ABC (Full Name)".',
             AcronymParams,
             check_acronym_definitions,
+        ),
+        RuleType(
+            "cross_references",
+            "Cross-references",
+            'Flags references such as "Section 3.2", "Figure 4" or "Table 2" whose target does not exist.',
+            CrossReferenceParams,
+            check_cross_references,
         ),
     ]
 }
