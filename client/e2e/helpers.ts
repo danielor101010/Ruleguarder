@@ -44,3 +44,8 @@ export async function templatesAvailable(request: APIRequestContext): Promise<{ 
 }
 
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** Match text literally inside a RegExp (template labels contain parentheses, e.g. "(PII)"). */
+export function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\]/g, "\$&");
+}

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { assertNoEnabledLlmRules, templatesAvailable } from "./helpers";
+import { assertNoEnabledLlmRules, escapeRegExp, templatesAvailable } from "./helpers";
 
 interface ApiTemplate {
   id: string;
@@ -23,7 +23,7 @@ test.describe("with the template endpoints", () => {
 
     await page.goto("/");
     await page.getByRole("button", { name: "Add from template" }).click();
-    await page.getByRole("group", { name: "Rule templates" }).getByRole("button", { name: new RegExp(pick.label) }).click();
+    await page.getByRole("group", { name: "Rule templates" }).getByRole("button", { name: new RegExp(escapeRegExp(pick.label)) }).click();
     const form = page.getByRole("form", { name: "New rule" });
     await expect(form.getByText(`From template: ${pick.label}`)).toBeVisible();
     await expect(form.getByLabel("Name")).toHaveValue(pick.rule.name);
