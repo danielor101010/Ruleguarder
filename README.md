@@ -47,6 +47,9 @@ can't be found, the whole paragraph is flagged instead of highlighting the wrong
 | `max_sentence_words` / `max_paragraph_words` | code | `max_words` |
 | `allowed_fonts` | code | `fonts` |
 | `font_size_range` | code | `min_pt`, `max_pt` |
+| `pii` | code | `categories` (ssn, phone, email, credit_card) |
+| `acronym_definitions` | code | `min_length`, `max_length`, `ignore` |
+| `cross_references` | code | `kinds` (section, figure, table) |
 
 The client builds the rule form from each type's JSON schema (`GET /api/rules/types`), so a
 new rule type needs no client changes.
@@ -68,7 +71,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build   # ap
 ```bash
 docker compose --profile test run --rm tests     # server: ruff, ruff format, mypy --strict, pytest (unit + E2E)
 cd client && npm run check                       # client: eslint (0 warnings), tsc, vitest
+docker compose -p rg-e2e -f docker-compose.yml -f docker-compose.e2e.yml --profile e2e run --rm e2e   # browser E2E (Playwright)
 ```
+
+The Playwright tests create rules and documents in the database of the stack they run against, and load the sample rules. Run them against a throwaway stack (`-p <name>` with other ports and a `.env` holding a placeholder key), not your working data.
 
 - Unit tests: parser, rule types, LLM pipeline (fake provider), Gemini provider (mocked SDK)
 - E2E: upload a generated sample .docx, create rules, run a check, verify the exact highlighted text

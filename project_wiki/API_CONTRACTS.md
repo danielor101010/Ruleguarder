@@ -98,14 +98,23 @@ interface Report {
 | `max_paragraph_words` | code | `max_words: int > 0` |
 | `allowed_fonts` | code | `fonts: string[]` (min 1) |
 | `font_size_range` | code | `min_pt: float = 0`, `max_pt: float = 200` (min ≤ max) |
+| `pii` | code | `categories: ("ssn" \| "phone" \| "email" \| "credit_card")[]` (default all) |
+| `acronym_definitions` | code | `min_length: int = 2`, `max_length: int = 6`, `ignore: string[]` |
+| `cross_references` | code | `kinds: ("section" \| "figure" \| "table")[]` (default all) |
 
 ## Internal LLM contract
 `LlmProvider.find_violations(rules: LlmRule[], blocks: LlmBlock[]) -> LlmViolation[]`, where `LlmViolation = {rule_id, block_id | None, quote, explanation}`. See ADR-004 for how quotes become offsets.
 
 ---
 
-## Spec (2026-09-29): rule templates & sample rules — `feature/rule-templates`
-Status: **specified, in implementation.**
+## Rule templates & sample rules — `feature/rule-templates`
+Status: **implemented** (2026-09-29). Refinements made during implementation:
+- `pii`: SSN is US and dashed only; credit cards need a known card prefix as well as Luhn; each span is reported under one category (email > card > SSN > phone); masking keeps the last 4 (SSN, card) or last 2 (phone) digits. **Excerpts are not masked** (ADR-011).
+- `acronym_definitions`: `max_length` ≤ 20 and `min_length` ≤ `max_length`; the acronym needs ≥ 2 letters; headings, runs of 2+ all-caps words (markings) and Roman numerals are skipped; the full name must plausibly expand the acronym.
+- `cross_references`: "Figure N" starts a caption only when followed by `:`, `.`, a dash or end of text; "Fig" without a dot is accepted; "Section N of <Capitalised>" is treated as external; lists/ranges are checked number by number (range endpoints only).
+- `POST /samples`: `skipped` = names already present (exact, case-sensitive). The markings sample uses `case_sensitive: true`.
+- JSON schema for list params: `{"type":"array","items":{"enum":[...],"type":"string"}}`.
+- Both static routes are registered before `/{rule_id}` (otherwise FastAPI answers 405).
 
 ### New deterministic rule types
 | key | params | Finding |
@@ -134,8 +143,8 @@ Sample set: PII (all), acronym definitions, cross-references, forbidden classifi
 
 ---
 
-## Spec (2026-09-29): dashboard UI — `feature/dashboard-ui`
-Status: **specified, in implementation.**
+## Dashboard UI — `feature/dashboard-ui`
+Status: **implemented** (2026-09-29), see ADR-012. The client treats 404 and 405 on optional endpoints as "not provided".
 - **Stack:** Tailwind CSS (Vite plugin); `styles.css` is replaced. English, LTR.
 - **Design:** dark slate/navy dashboard shell (`slate-950` → navy gradient). Content surfaces use the wiki's glass tokens (`backdrop-blur-md bg-white/70 border border-white/40 rounded-2xl/3xl`); primary buttons are dark pills (`#0F172A`, `rounded-full`). Accessible contrast and visible focus rings.
 - **Layout:** top bar (brand, document name, severity counters). Left sidebar: Rules panel (New rule, **Add from template** picker, **Load Sample Rules** button, enable toggles) and Documents panel (upload, list). Main: **split screen**. Left = document paragraphs with severity highlights (High red, Medium orange, Low yellow). Right = violations list with severity filter chips (with counts) and a rule filter. Clicking a violation smoothly scrolls to the paragraph and **flashes** it (~1.5 s), and it stays marked active.

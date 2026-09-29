@@ -4,9 +4,37 @@ Newest first. Branch chain so far (nothing merged into `dev` / `main` yet):
 
 ```
 dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-tests → fix/gemini-overload-fallback → feature/quality-gates → refactor/severity-levels
+   ├→ feature/rule-templates  (subagent 1) ─┐
+   └→ feature/dashboard-ui    (subagent 2) ─┴→ feature/templates-dashboard-integration
 ```
 
 ---
+
+## 2026-09-29 – `feature/templates-dashboard-integration` (lead)
+- Merged `feature/rule-templates` and `feature/dashboard-ui` (no conflicts).
+- **Verification:** templates branch re-run by the lead on a fresh DB (154 passed). Integrated stack in a separate worktree with a placeholder key:
+  - server: ruff ✅, format ✅, mypy --strict ✅, **154 passed**
+  - client: eslint 0 warnings ✅, tsc ✅, **86 passed**, build ✅
+  - Playwright: **5 passed, 1 skipped** (the skip is the "endpoints missing" fallback test, correct now that the endpoints exist)
+- **Bugs found in integration:**
+  - The Playwright template test built a RegExp from an unescaped label ("No personal data (PII)"), so it never matched once the real endpoints existed. Fixed with `escapeRegExp`. A first attempt had broken escaping; ESLint caught it, and it was fixed in a follow-up commit.
+  - PII masking is cosmetic (full values remain in excerpts and stored documents); recorded in ADR-011 as an open decision.
+- **Demo check** (sample rules, placeholder key, AI rule off): a test .docx produced 9 violations (5 high, 2 medium, 2 low), all correctly located and masked in messages. Screenshots were reviewed at 1440 px and 390 px.
+- Housekeeping: `*.tsbuildinfo` untracked and ignored; `.claude/worktrees/` ignored; agent worktrees, temporary stacks and images removed. The main app on :8080 was rebuilt to this version; the user's 2 rules were kept and upgraded to the new severity names.
+
+## 2026-09-29 – `feature/dashboard-ui` (subagent 2)
+- Tailwind v4 dashboard: dark slate/navy shell, glass panels, dark pill buttons, focus rings; stacks below `lg`. See ADR-012.
+- Split screen: document with High/Medium/Low highlights | violations with severity chips (counts) and a rule filter; document-level violations first. A click smooth-scrolls, flashes for 1.5 s and keeps the paragraph active; clicking a highlight selects its card.
+- Rules sidebar: "Add from template", "Load Sample Rules" ("N added, M already present"), "AI · uses quota" badge; new blank rules default to a non-AI type; template features hide on 404/405.
+- **Tests:** client 86 (+54); Playwright E2E in Docker (`docker-compose.e2e.yml`).
+
+## 2026-09-29 – `feature/rule-templates` (subagent 1)
+- New deterministic rule types:
+  - `pii` (email, credit card with Luhn + prefix, US SSN, phone; masked messages);
+  - `acronym_definitions`;
+  - `cross_references` (section/figure/table, computed outline numbers, captions, lists/ranges).
+- `RULE_TEMPLATES` (11, 6 in the sample set); `GET /api/rules/templates`, `POST /api/rules/samples` (idempotent by name, AI sample disabled).
+- **Tests:** server 154 (+96, incl. many negative PII cases: dates, versions, "50 km", IPs, ISBN).
 
 ## 2026-09-29 – `refactor/severity-levels`
 - error / warning / info → **high / medium / low** across API, DB, client and CSS (red / orange / yellow). See ADR-010.
@@ -62,5 +90,6 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ## Open items
 - Real-LLM E2E rerun on `gemini-3.5-flash` (needs product-owner OK, since it spends quota).
-- UI redesign: the wiki's design system (glassmorphism, Tailwind) vs the earlier request (slate / dark navy dashboard). Needs a decision.
-- Rule templates: PII regex, acronym definitions, cross-references.
+- UI design: combined as glass panels on a slate/navy shell (ADR-012). Product owner to confirm.
+- PII data protection: masking is cosmetic (ADR-011). Decide on excerpt masking and document retention/encryption.
+- Multi-select input for array params (e.g. PII categories).

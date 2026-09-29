@@ -70,3 +70,43 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 **Context.** The product owner wants High = red, Medium = orange, Low = yellow. The API used error / warning / info.
 **Decision.** `Severity = Literal["low", "medium", "high"]` with a Pydantic `BeforeValidator` that maps the legacy names (error→high, warning→medium, info→low). Stored reports are therefore upgraded on read, and `ReportSummary.by_severity` keys are merged. Stored rules are rewritten once at startup by `app/migrations.py::upgrade_legacy_severities` (idempotent). The default severity is `high`.
 **Consequences.** Old clients sending legacy names keep working. Colours: high `#dc2626`, medium `#ea580c`, low `#a16207` (yellow-700, chosen for text contrast on light backgrounds).
+
+## ADR-011 – Rule templates and sample rules (Accepted, 2026-09-29)
+**Context.** New users start with an empty rule list and have to learn every rule type's params. The product owner asked for an "Add from template" picker, a one-click "Load Sample Rules" button, and three more deterministic checks (PII, acronym definitions, cross-references).
+**Decision.**
+- Templates live in server code, `app/rules/templates.py` (`RULE_TEMPLATES`, 11 templates, 6 in the sample set), as the single source of truth; the client only renders `GET /api/rules/templates`. Each template carries a complete `RuleCreate`. Template params go through `validate_rule_params` at import, so a broken template fails at startup.
+- `POST /api/rules/samples` is idempotent by rule **name**: existing names are skipped, never overwritten, so a user's edits survive a second click. The AI sample rule is created **disabled** (ADR-008, quota).
+- The new checkers are precision-first: they need written structure (dashed SSN, separators or "+" in phone numbers, a Luhn-valid card number with a known prefix, an explicit "Full Name (ABC)", a caption or heading target). Section targets include an outline number recomputed from heading levels, because Word's automatic numbering isn't in the text.
+- Larger checkers live in their own modules (`pii.py`, `acronyms.py`, `cross_references.py`); `Finding` moved to `app/rules/finding.py` to avoid an import cycle.
+
+**Consequences.**
+- Templates change only through a deploy (no admin UI). A renamed sample rule is created again on the next "Load Sample Rules".
+- Known false positives / misses:
+  - part numbers like "0301-2345-678" are read as phones;
+  - undashed SSNs and unseparated phone numbers are missed;
+  - "API SDK" written side by side is skipped;
+  - "Chapter N" references are not checked;
+  - Word SEQ caption fields are not in the parsed text (caption position is used instead).
+- ⚠️ **PII masking is cosmetic, not data protection** (found in integration review). The violation **message** is masked (`•••• 1111`), but the **excerpt** and the stored document blocks contain the full value, and both are kept in the DB and shown in the UI. Protecting stored PII would need excerpt masking plus encryption or retention rules for documents: **open decision for the product owner**.
+
+## ADR-012 – Dashboard UI: Tailwind v4 tokens, glass surfaces, hook/lib split (Accepted, 2026-09-29)
+**Context.** The spec asks for a dark dashboard with glass surfaces, a split-screen report, filters and click-to-locate, and template/sample features built in parallel with their endpoints.
+**Decision.**
+- Tailwind CSS v4 via `@tailwindcss/vite` (its peer range covers Vite 5; no PostCSS or `tailwind.config.js`). Tokens live in the `styles.css` `@theme`: accent `#0F172A`, `navy-950`, the severity colours (ADR-010), `animate-flash` (1.5 s). Per-severity class sets are literal strings in `lib/severity.ts` so Tailwind's scanner finds them.
+- Surfaces: `GlassPanel` = `rounded-3xl border-white/40 bg-white/70 backdrop-blur-md` over a slate-950→navy gradient; primary buttons are dark `rounded-full` pills; a global `:focus-visible` outline; reduced motion is respected. `dir="auto"` stays on all document text.
+- Components render only; state/data in hooks (`useRules`, `useDocuments`, `useRuleTemplates`, `useDocumentReport`, `useViolationFilters`, `useViolationFocus`); pure logic in `lib/`.
+- Flash = a keyed overlay element remounted on each click (restarts the animation); `data-active` / `data-flash` / `aria-current` are the stable test hooks.
+- Optional endpoints: 404 **and** 405 mean "not provided" (FastAPI answers 405 when a static path collides with `/{rule_id}`); the UI hides the feature instead of erroring.
+- E2E: Playwright (`mcr.microsoft.com/playwright:v1.63.0-noble`) on the compose network (`docker-compose.e2e.yml`); the .docx is generated at test time; non-LLM rules only, with a guard that fails if any enabled `llm` rule exists before a check.
+
+**Consequences.** No custom CSS classes to maintain; a new severity needs a token and a `SEVERITY_CLASSES` entry. Array params (e.g. `pii.categories`) are entered as comma-separated text: no multi-select yet.
+
+## ADR-013 – Parallel subagents with worktree isolation (Accepted, 2026-09-29)
+**Context.** The product owner asked to run the next tasks with subagents.
+**Decision.**
+- Spec first: the lead writes the contract into `API_CONTRACTS.md` before starting the agents.
+- Each agent works in its own git worktree and branch, with its own Docker compose project and ports, and a `.env` copied from `.env.example` (placeholder key, so no LLM calls are possible).
+- Agents do not edit the wiki, TODO or README; they return wiki notes in their report.
+- The lead verifies each branch independently (fresh DB, all gates), merges into an integration branch, runs every gate together in a separate worktree, reviews screenshots, and writes the wiki.
+
+**Consequences.** Integration found issues neither agent could see alone: a Playwright locator built from an unescaped label, and the PII masking overstatement. Both agents' worktrees started at the initial commit instead of the intended base; both noticed and branched from the right commit, so the lead should check the base on every hand-back.

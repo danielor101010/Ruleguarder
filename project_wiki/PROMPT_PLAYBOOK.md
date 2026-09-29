@@ -32,6 +32,23 @@ Example given (Hebrew): the user uploads a document describing an operational sy
 
 → Standing rule: **no real LLM API calls without explicit approval.** Retries and fallbacks are bounded and off by default (ADR-008).
 
+### P7 – Verify before building on it
+> "Beside the LLM, does it work?" → answered from test evidence only; UI click-through was flagged as unverified, which led to Playwright.
+
+### P8 – Finish the rest, with subagents
+> "Keep going, I handle the LLM API key now. Finish the rest." / "Run subagents on the next task."
+
+→ Lead did quality gates and the severity refactor itself, wrote the spec, then ran two parallel subagents (ADR-013).
+
+**Subagent brief pattern (reuse):**
+- the task and the contract location (spec in `API_CONTRACTS.md`);
+- hard rules: no LLM calls; `.env` from `.env.example` only; branch name; Conventional Commits with a Co-Authored-By line; no wiki/TODO/README edits; files it may and may not touch; own compose project and ports; don't touch the main stack;
+- the exact gate commands;
+- a required final report: commits, implementation summary, exact test results, wiki notes ready to paste, open issues.
+
+### P9 – Visibility
+> "Show me in chat the todo / I don't see any progress in the todo." → TODO.md is refreshed by the lead on every status check (agents don't edit it).
+
 ---
 
 ## System prompts used by the app
