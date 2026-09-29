@@ -112,12 +112,12 @@ Order set by you. Each mission gets its own branch, tests, and wiki update per `
 
 ## ~~M1 – Delete confirmation pop-up~~: cancelled by you (the inline Delete → Confirm / Keep stays)
 
-## M2 – Accuracy test set for the AI rules — `feature/llm-eval-set`
+## M2 – Accuracy test set for the AI rules — `feature/llm-eval-set` — 🟡 built; baseline waits for your OK
 Measure how many real violations the AI catches (recall) and how many it invents (false positives), then tune the prompt.
-- [ ] 8–12 sample .docx files (English + Hebrew) with **known, labelled** violations: performance figures, architecture/data-flow details, plus traps that must NOT be flagged (e.g. "approximately fast", years, page numbers)
-- [ ] Labels file: rule → expected quotes per document
-- [ ] Eval script: runs the AI rules and matches found quotes to labels → recall, precision, per-rule table, list of misses
-- [ ] Opt-in only, never in the default test run; prints the number of API calls **before** running and asks for confirmation
+- [x] 10 sample .docx files (English + Hebrew) with **known, labelled** violations: performance figures, architecture/data-flow details, plus traps that must NOT be flagged (e.g. "approximately fast", years, page numbers)
+- [x] Labels: expected / optional / trap quotes per document (`server/eval/dataset.py`)
+- [x] Eval script: runs the AI rules and matches found quotes to labels → recall, precision, per-rule table, list of misses
+- [x] Opt-in only, never in the default test run; prints the number of API calls **before** running and asks for confirmation
 - [ ] Baseline report saved in the wiki; then prompt/effort tuning, with each change compared against the baseline
 - **Done when:** a baseline recall/precision is recorded and each prompt change has before/after numbers. ⚠️ Spends quota: run count agreed with you first
 

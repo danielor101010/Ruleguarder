@@ -15,7 +15,7 @@ ignore = [
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["app", "tests"]
+files = ["app", "tests", "eval"]
 
 [[tool.mypy.overrides]]
 module = ["docx.*"]

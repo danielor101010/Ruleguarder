@@ -95,6 +95,15 @@ docker compose -p rg-e2e -f docker-compose.yml -f docker-compose.e2e.yml --profi
 Tests never call the real AI API. The one real-AI test is opt-in:
 `docker compose --profile test run --rm tests pytest -m llm`.
 
+### Measuring AI rule accuracy
+
+`server/eval` holds labelled documents with known violations and traps. It reports recall and precision per rule.
+
+```bash
+docker compose --profile test run --rm tests python -m eval              # plan and API call count only
+docker compose --profile test run --rm tests python -m eval --run --yes  # calls the AI (spends quota)
+```
+
 ## Project structure
 
 ```

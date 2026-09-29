@@ -10,6 +10,12 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `feature/llm-eval-set` (M2, lead)
+- Evaluation harness for AI rules (ADR-016): 10 labelled documents (en/he), 30 expected violations, 20 traps, 3 optional; scoring by span overlap; recall/precision per rule; misses and false positives listed.
+- `python -m eval` prints the plan (10 API calls); `--run --yes` calls the LLM. Added `count_llm_calls()` to `llm_check`.
+- **Tests:** server 203 passed (+21: every label occurs in its document, dataset shape, scoring incl. overlap, optional, unlocated, trap hits, totals, and the CLI never creates a provider in plan mode). ruff, format, mypy --strict clean.
+- **Baseline: not run yet.** It needs the product owner's OK (10 API calls).
+
 ## 2026-09-29 – `feature/readme` (lead)
 - README rewritten as a concise product README: features, architecture, getting started, configuration, data-privacy note, usage, testing, project structure. History and decisions stay in `project_wiki/`.
 - M1 (delete confirmation pop-up) cancelled by the product owner.

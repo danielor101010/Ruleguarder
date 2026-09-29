@@ -177,3 +177,22 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - The engine takes the ORM `Rule`.
 - `check_llm_rules` reads settings itself.
 - No client-side cancel or timeout for a running check (nginx ends it at 600 s → 504).
+
+## ADR-016 – Offline evaluation set for AI rules (Accepted, 2026-09-29)
+**Context.** Whether the AI rules find every violation was only spot-checked. Prompt, model or effort changes need a number to compare against.
+**Decision.**
+- `server/eval/`: 10 labelled documents (English + Hebrew, one with a table, one with no violations) and two AI rules: performance figures and internal architecture details.
+- The documents are built as real .docx files at run time and parsed by the production parser; the AI check runs through the production `check_llm_rules`.
+- Labels are verbatim quotes:
+  - **expected**: 30; they count for recall and precision;
+  - **traps**: 20; must not be flagged (years, versions, section/page/figure numbers, counts, prices, vague "performs well");
+  - **optional**: 3 borderline cases; they count neither way.
+- Matching: same block, overlapping character span. An unlocated finding (quote not found) matches its whole block and is reported separately.
+- Metrics per rule and total: **recall** (share of expected violations found), **precision** (share of judged findings that are correct), plus a list of misses and false positives. Traps are marked.
+- **Quota safety:**
+  - `python -m eval` only prints the plan and the exact call count (10 calls; 20 worst case with retries);
+  - it calls the LLM only with `--run` plus confirmation (`--yes` when not interactive);
+  - it is never part of `pytest`: the harness tests use a fake provider.
+- Results are written to `server/eval/results/` (git-ignored); baselines are copied into this wiki.
+
+**Consequences.** Every prompt or model change is judged against the recorded baseline. Adding a case means adding a document and its labels; a label that doesn't occur in its document fails the tests.

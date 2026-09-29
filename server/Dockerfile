@@ -16,6 +16,7 @@ FROM base AS test
 COPY requirements-dev.txt pytest.ini pyproject.toml ./
 RUN pip install -r requirements-dev.txt
 COPY tests ./tests
+COPY eval ./eval
 # All quality gates: lint, formatting, types, tests
 CMD ["sh", "-c", "ruff check . && ruff format --check . && mypy && pytest -v"]
 
