@@ -14,7 +14,7 @@ highlighted in the document, with paragraph / table cell and the nearest heading
 |---|---|---|
 | Server | Python 3.12, FastAPI | Best DOCX tooling is in Python; typed API with auto docs at `/docs` |
 | DOCX parsing | python-docx | Paragraphs, headings, tables, runs, fonts and sizes, all in document order |
-| LLM | Google Gemini (`gemini-3.8-flash` by default) via the `google-genai` SDK with native structured output, behind a provider interface | Understands rules written in natural language; the provider can be swapped (e.g. for a self-hosted model) |
+| LLM | Google Gemini (`gemini-3.5-flash` by default, optional fallback models) via the `google-genai` SDK with native structured output, behind a provider interface | Understands rules written in natural language; the provider can be swapped (e.g. for a self-hosted model) |
 | DB | PostgreSQL 16 + SQLAlchemy 2 | Rules, documents (parsed structure), stored check reports |
 | Client | React 18 + TypeScript + Vite | Document viewer with highlights; RTL handled with `dir="auto"` |
 | Infra | Docker Compose: `db`, `server`, `client` (nginx) | nginx serves the built client and proxies `/api`, so the app has one origin |
@@ -71,7 +71,8 @@ docker compose --profile test run --rm tests     # unit + E2E against the runnin
 
 - Unit tests: parser, rule types, LLM pipeline (fake provider), Gemini provider (mocked SDK)
 - E2E: upload a generated sample .docx, create rules, run a check, verify the exact highlighted text
-- The real-Gemini E2E test runs only when `GEMINI_API_KEY` in `.env` is a real key
+- The real-Gemini E2E test spends API quota, so it is **opt-in**:
+  `docker compose --profile test run --rm tests pytest -m llm`
 
 ## API
 
@@ -105,4 +106,4 @@ client/src/
   components/ReportView.tsx      document with highlights + violations list
 ```
 
-See [TODO.md](TODO.md) for progress and next steps.
+See [TODO.md](TODO.md) for progress and [project_wiki/](project_wiki/) for architecture decisions, the development log and API contracts.

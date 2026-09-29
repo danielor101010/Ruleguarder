@@ -9,7 +9,9 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 | `feature/project-scaffold` | `dev` | ✅ committed |
 | `feature/gemini-integration` | `feature/project-scaffold` | ✅ committed |
 | `feature/e2e-tests` | `feature/gemini-integration` | ✅ committed |
-| `feature/dashboard-ui` | `feature/e2e-tests` | next |
+| `fix/gemini-overload-fallback` | `feature/e2e-tests` | ✅ committed |
+| `feature/quality-gates` | `fix/gemini-overload-fallback` | next (Ruff, mypy, ESLint, Vitest) |
+| `feature/dashboard-ui` | – | planned (design decision needed) |
 | `feature/rule-templates` | – | planned |
 
 ## ✅ Phase 1 – Scaffold (`feature/project-scaffold`)
@@ -26,7 +28,7 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 - [x] Native structured output: `response_mime_type="application/json"` + Pydantic `response_schema`
 - [x] Retry with backoff on 429 / 5xx (free-tier quotas), clear errors for blocked / truncated answers
 - [x] `GEMINI_API_KEY` + `LLM_*` settings in `.env.example`
-- [x] Default model `gemini-3.8-flash` (1.5 models are no longer available); `gemini-3.1-pro-preview` for deeper review
+- [x] Default model `gemini-3.8-flash` (1.5 models are no longer available) → changed to `gemini-3.5-flash` in `fix/gemini-overload-fallback`
 
 ## ✅ Phase 2b – Tests (`feature/e2e-tests`)
 - [x] `tests` service in docker-compose (`docker compose --profile test run --rm tests`)
@@ -35,7 +37,18 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 - [x] Fixed bug found by tests: table cells were dropped (merged-cell dedup used reused `id()`s)
 - [x] DB port no longer published in prod (clashed with a local Postgres); dev uses 5433
 - [x] Full stack verified: http://localhost:8080 → nginx → API → Postgres
-- [!] Real Gemini E2E: put a real `GEMINI_API_KEY` in `.env`, then rerun the tests
+- [x] Real Gemini E2E passed (found 50 km, 3 m, 2 seconds) – but took 154 s due to 503s
+
+## ✅ Fix – Gemini overload & quota (`fix/gemini-overload-fallback`)
+- [x] Default `gemini-3.5-flash`; optional fallback models; 503/504/timeout → next model
+- [x] Only 429 retried, `LLM_MAX_RETRIES=1`, `LLM_MAX_PARALLEL=1`, `LLM_TIMEOUT_SECONDS=120`
+- [x] Real-LLM tests opt-in only (`pytest -m llm`); bounded request count unit-tested
+- [x] Project wiki created (`project_wiki/`)
+- [!] Rerun real-LLM E2E on `gemini-3.5-flash` – only with your OK (spends quota)
+
+## Next – Quality gates (`feature/quality-gates`, required by project wiki)
+- [ ] Ruff + mypy (server), zero warnings
+- [ ] ESLint + Vitest (client), unit tests for highlight segmentation / API client
 
 ## Phase 3 – Dashboard UI (`feature/dashboard-ui`)
 - [ ] Enterprise security dashboard look: slate / dark navy theme, LTR, English-first
