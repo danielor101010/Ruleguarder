@@ -13,6 +13,7 @@ highlighted in the document and listed with its location: paragraph or table cel
 - **Built-in checks:** forbidden or required text (plain or regex), sentence and paragraph length, allowed fonts, font size range, personal data (email, phone, SSN, credit card), undefined acronyms, broken section/figure/table references
 - **Exact locations:** the AI quotes the offending text and the server locates it character by character, so a highlight never points at the wrong text
 - **Rule templates** and a one-click sample rule set
+- **Background checks** with a progress bar; a check can be cancelled, and a reloaded page reconnects to it
 - **Resilient checks:** if one rule fails (for example, the AI service is unavailable), the other rules still report and the report is marked incomplete
 - **Report view:** the document with severity highlights (high, medium, low) side by side with a filterable violations list; clicking a violation scrolls to it
 - Hebrew and other right-to-left documents are supported

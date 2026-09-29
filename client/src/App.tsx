@@ -78,6 +78,9 @@ export default function App() {
               violations={report.violations}
               failedRules={report.failedRules}
               checking={report.checking}
+              progress={report.progress}
+              notice={report.notice}
+              onCancel={report.cancelCheck}
               checkedAt={report.checkedAt}
               aiRulesEnabled={aiRulesEnabled}
               onCheck={report.runCheck}

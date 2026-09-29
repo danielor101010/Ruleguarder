@@ -10,6 +10,16 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `feature/background-checks` (M3, lead)
+- Background checks with progress and cancel (ADR-018): 4 new endpoints, `CheckRunner`, progress columns and startup migration, restart recovery.
+- **Bug found by tests and fixed:** after a cancel, queued AI requests still started (3 calls instead of 1); requests are now submitted lazily.
+- Client: `useDocumentReport` starts, polls (1 s), cancels and reconnects after a reload; `CheckProgress` bar ("AI rules: part 3 of 7", n / total, Cancel); the newest failed check is explained.
+- **Process note:** several sessions shared one working tree, and another session switched it to its own branch while this work was uncommitted. The work was moved to a dedicated worktree (`../rg-m3`); the other sessions were informed.
+- **Tests:**
+  - server 214 passed (+11: state transitions, progress counts, cancel stops further AI requests, one active check, partial/total failure, deleted rules, restart recovery, column migration; API E2E for the async flow and errors)
+  - client 105 passed (+6)
+  - Playwright 5 passed / 1 skipped (isolated stack)
+
 ## 2026-09-29 – `feature/llm-eval-set` (M2, lead)
 - Evaluation harness for AI rules (ADR-016): 10 labelled documents (en/he), 30 expected violations, 20 traps, 3 optional; scoring by span overlap; recall/precision per rule; misses and false positives listed.
 - `python -m eval` prints the plan (10 API calls); `--run --yes` calls the LLM. Added `count_llm_calls()` to `llm_check`.

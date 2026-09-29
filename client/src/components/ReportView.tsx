@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { useViolationFilters } from "../hooks/useViolationFilters";
 import { useViolationFocus } from "../hooks/useViolationFocus";
 import { violationsByBlock } from "../lib/highlight";
-import type { DocumentFull, FailedRule, Violation } from "../types";
+import type { CheckStatus, DocumentFull, FailedRule, Violation } from "../types";
+import CheckProgress from "./CheckProgress";
 import DocumentPane from "./DocumentPane";
 import { Button, Icon, Panel, WarningNote } from "./ui";
 import ViolationsPanel from "./ViolationsPanel";
@@ -13,6 +14,11 @@ interface Props {
   /** Rules the check could not run; shown so an incomplete report never looks clean. */
   failedRules?: FailedRule[];
   checking: boolean;
+  /** The running background check, shown as a progress bar. */
+  progress?: CheckStatus | null;
+  /** Outcome message of the last check, e.g. "Check cancelled." */
+  notice?: string | null;
+  onCancel?: () => void;
   checkedAt: string | null;
   /** Enabled rules of type `llm`: a check will spend AI quota. */
   aiRulesEnabled: number;
@@ -28,6 +34,9 @@ export default function ReportView({
   violations,
   failedRules = NO_FAILED_RULES,
   checking,
+  progress = null,
+  notice = null,
+  onCancel,
   checkedAt,
   aiRulesEnabled,
   onCheck,
@@ -53,9 +62,17 @@ export default function ReportView({
             {aiRulesEnabled} AI {aiRulesEnabled === 1 ? "rule" : "rules"} enabled · each check uses AI quota
           </span>
         )}
-        <Button icon="play" onClick={onCheck} disabled={checking}>
-          {checking ? "Checking…" : violations ? "Re-check" : "Check document"}
-        </Button>
+        {!checking && (
+          <Button icon="play" onClick={onCheck}>
+            {violations ? "Re-check" : "Check document"}
+          </Button>
+        )}
+        {progress && onCancel && <CheckProgress progress={progress} onCancel={onCancel} />}
+        {!checking && notice && (
+          <p role="status" className="w-full text-sm text-slate-400">
+            {notice}
+          </p>
+        )}
       </Panel>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

@@ -1,5 +1,6 @@
 import type {
   Block,
+  CheckStatus,
   DocumentFull,
   DocumentSummary,
   Report,
@@ -129,5 +130,20 @@ export function report(violations: Violation[]): Report {
     document: DOC,
     violations,
     summary: { total: violations.length, by_severity: {}, rules_checked: 1 },
+  };
+}
+
+export function checkStatus(overrides: Partial<CheckStatus> = {}): CheckStatus {
+  return {
+    check_id: 50,
+    document_id: 1,
+    status: "running",
+    progress_done: 1,
+    progress_total: 4,
+    step: "AI rules: part 1 of 3",
+    error: null,
+    created_at: "2026-09-29T10:04:00Z",
+    finished_at: null,
+    ...overrides,
   };
 }

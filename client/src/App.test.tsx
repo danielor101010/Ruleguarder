@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "./api";
 import App from "./App";
-import { DOC, report, rule, RULE_TYPES, summary, template, violation } from "./test/fixtures";
+import { checkStatus, DOC, report, rule, RULE_TYPES, summary, template, violation } from "./test/fixtures";
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -51,12 +51,16 @@ describe("App", () => {
     vi.spyOn(api, "latestReport").mockRejectedValue(new ApiError(404, "never checked"));
     vi.spyOn(api, "document").mockResolvedValue(DOC);
     const v = violation({ id: "1-0", rule_name: "No figures", block_id: 1, start: 23, end: 28 });
-    vi.spyOn(api, "check").mockResolvedValue(report([v]));
+    vi.spyOn(api, "latestCheck").mockRejectedValue(new ApiError(404, "never checked"));
+    vi.spyOn(api, "startCheck").mockResolvedValue(checkStatus({ status: "queued" }));
+    vi.spyOn(api, "getCheck").mockResolvedValue(checkStatus({ status: "completed", progress_done: 4 }));
     render(<App />);
 
     await userEvent.click(await screen.findByRole("button", { name: /^spec\.docx/ }));
+    vi.spyOn(api, "latestReport").mockResolvedValue(report([v]));
     await userEvent.click(await screen.findByRole("button", { name: "Check document" }));
-    const counters = await screen.findByRole("list", { name: "Violations by severity" });
+    expect(await screen.findByRole("progressbar", { name: "Check progress" })).toBeInTheDocument();
+    const counters = await screen.findByRole("list", { name: "Violations by severity" }, { timeout: 3000 });
     expect(within(counters).getByText(/High/)).toHaveTextContent("High 1");
     expect(screen.getByText("50 km").tagName).toBe("MARK");
   });

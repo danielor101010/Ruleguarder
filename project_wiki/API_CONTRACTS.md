@@ -160,8 +160,8 @@ Status: **implemented** (2026-09-29), see ADR-012. The client treats 404 and 405
 
 ---
 
-## Spec (2026-09-29): background checks with progress — `feature/background-checks` (M3)
-Status: **specified, in implementation.**
+## Background checks with progress — `feature/background-checks` (M3)
+Status: **implemented** (2026-09-29), see ADR-018.
 
 | Method | Path | Response | Errors |
 |---|---|---|---|

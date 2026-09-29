@@ -196,3 +196,17 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - Results are written to `server/eval/results/` (git-ignored); baselines are copied into this wiki.
 
 **Consequences.** Every prompt or model change is judged against the recorded baseline. Adding a case means adding a document and its labels; a label that doesn't occur in its document fails the tests.
+
+## ADR-018 – Background checks with progress and cancel (Accepted, 2026-09-29)
+(ADR-017 is used by the monochrome UI work on `feature/monochrome-ui`.)
+**Context.** A check was one blocking HTTP request; long documents with AI rules kept the page waiting with no feedback, and a reload lost the result.
+**Decision.**
+- `CheckRunner` (`app/checks.py`), one per process: a small thread pool (`CHECK_WORKERS`, default 2) runs `run_rules` in the background. All state is in `check_runs`: `status` (queued → running → completed / failed / cancelled), `progress_done` / `progress_total`, `step`, `finished_at`. Clients poll `GET /api/checks/{id}` (every 1 s in the UI), and a reloaded page reconnects via `GET /api/documents/{id}/checks/latest`.
+- Progress: one step for all built-in rules and one per AI request; `Progress` protocol (`rules/progress.py`) with `begin/advance/cancelled`.
+- Cancel: the row is marked `cancelled` at once and an in-memory flag is set. The engine checks the flag between steps and raises `CheckCancelled`; an AI request already in flight finishes, but its result is discarded.
+- AI requests are now submitted **lazily**, at most `LLM_MAX_PARALLEL` in flight. With a pre-filled pool, the worker started the next queued request before a cancel (or a failure) could stop it. A test caught this: 3 requests instead of 1.
+- One active check per document (a lock around find-or-create). A second start returns the running check.
+- Startup: `add_missing_columns` (`create_all` doesn't alter existing tables) and `fail_interrupted_checks` (checks left queued/running by a restart become `failed`).
+- The synchronous `POST /documents/{id}/check` stays for tests and scripts. Both paths share `finish_run` (with no rule checked → `failed`, else `completed`).
+
+**Consequences.** Single-process design: the cancel flag and worker pool live in memory, so several server replicas would need a shared queue (e.g. a DB-polled job table or Redis). Progress costs one small UPDATE per step.
