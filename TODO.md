@@ -10,7 +10,8 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 | `feature/gemini-integration` | `feature/project-scaffold` | ✅ committed |
 | `feature/e2e-tests` | `feature/gemini-integration` | ✅ committed |
 | `fix/gemini-overload-fallback` | `feature/e2e-tests` | ✅ committed |
-| `feature/quality-gates` | `fix/gemini-overload-fallback` | next (Ruff, mypy, ESLint, Vitest) |
+| `feature/quality-gates` | `fix/gemini-overload-fallback` | ✅ committed |
+| `refactor/severity-levels` | `feature/quality-gates` | next |
 | `feature/dashboard-ui` | – | planned (design decision needed) |
 | `feature/rule-templates` | – | planned |
 
@@ -46,9 +47,9 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 - [x] Project wiki created (`project_wiki/`)
 - [!] Rerun real-LLM E2E on `gemini-3.5-flash` – only with your OK (spends quota)
 
-## Next – Quality gates (`feature/quality-gates`, required by project wiki)
-- [ ] Ruff + mypy (server), zero warnings
-- [ ] ESLint + Vitest (client), unit tests for highlight segmentation / API client
+## ✅ Quality gates (`feature/quality-gates`)
+- [x] Ruff + strict mypy (server), zero findings; `tests` image runs every gate
+- [x] ESLint 10 (0 warnings) + tsc + Vitest (client), 32 tests; logic extracted to lib/ and hooks/
 
 ## Phase 3 – Dashboard UI (`feature/dashboard-ui`)
 - [ ] Enterprise security dashboard look: slate / dark navy theme, LTR, English-first

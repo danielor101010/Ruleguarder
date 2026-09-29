@@ -1,70 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError } from "./api";
+import { api } from "./api";
 import DocumentsPanel from "./components/DocumentsPanel";
 import ReportView from "./components/ReportView";
 import RulesPanel from "./components/RulesPanel";
-import type { DocumentFull, DocumentSummary, Rule, Violation } from "./types";
+import { errorMessage, useDocumentReport } from "./hooks/useDocumentReport";
+import type { DocumentSummary, Rule } from "./types";
 
 export default function App() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [listError, setListError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [document, setDocument] = useState<DocumentFull | null>(null);
-  const [violations, setViolations] = useState<Violation[] | null>(null);
-  const [checkedAt, setCheckedAt] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const report = useDocumentReport(selectedId);
 
-  const loadRules = useCallback(() => api.rules().then(setRules).catch((e) => setError(e.message)), []);
-  const loadDocuments = useCallback(() => api.documents().then(setDocuments).catch((e) => setError(e.message)), []);
+  const loadRules = useCallback(
+    () => api.rules().then(setRules).catch((e: unknown) => setListError(errorMessage(e))),
+    [],
+  );
+  const loadDocuments = useCallback(
+    () => api.documents().then(setDocuments).catch((e: unknown) => setListError(errorMessage(e))),
+    [],
+  );
 
   useEffect(() => {
-    loadRules();
-    loadDocuments();
+    void loadRules();
+    void loadDocuments();
   }, [loadRules, loadDocuments]);
 
-  useEffect(() => {
-    setDocument(null);
-    setViolations(null);
-    setCheckedAt(null);
-    setError(null);
-    if (selectedId === null) return;
-
-    let cancelled = false;
-    api
-      .latestReport(selectedId)
-      .then((report) => {
-        if (cancelled) return;
-        setDocument(report.document);
-        setViolations(report.violations);
-        setCheckedAt(report.checked_at);
-      })
-      .catch(async (err) => {
-        if (!(err instanceof ApiError && err.status === 404)) throw err;
-        const doc = await api.document(selectedId);
-        if (!cancelled) setDocument(doc);
-      })
-      .catch((err) => !cancelled && setError(err.message));
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedId]);
-
-  async function runCheck() {
-    if (selectedId === null) return;
-    setChecking(true);
-    setError(null);
-    try {
-      const report = await api.check(selectedId);
-      setDocument(report.document);
-      setViolations(report.violations);
-      setCheckedAt(report.checked_at);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setChecking(false);
-    }
-  }
+  const error = report.error ?? listError;
 
   return (
     <div className="app">
@@ -84,19 +47,26 @@ export default function App() {
         </aside>
         <main className="main">
           {error && <p className="error banner">{error}</p>}
-          {document ? (
+          {report.document ? (
             <ReportView
-              document={document}
-              violations={violations}
-              checking={checking}
-              checkedAt={checkedAt}
-              onCheck={runCheck}
+              key={`${report.document.id}-${report.checkedAt ?? "unchecked"}`}
+              document={report.document}
+              violations={report.violations}
+              checking={report.checking}
+              checkedAt={report.checkedAt}
+              onCheck={report.runCheck}
             />
           ) : (
             <div className="empty">
-              <p>1. Create rules on the left (e.g. “no numeric figures that reveal system performance”).</p>
-              <p>2. Upload a .docx document.</p>
-              <p>3. Click “Check document” to see every violation and where it is.</p>
+              {report.loading ? (
+                <p>Loading…</p>
+              ) : (
+                <>
+                  <p>1. Create rules on the left (e.g. “no numeric figures that reveal system performance”).</p>
+                  <p>2. Upload a .docx document.</p>
+                  <p>3. Click “Check document” to see every violation and where it is.</p>
+                </>
+              )}
             </div>
           )}
         </main>

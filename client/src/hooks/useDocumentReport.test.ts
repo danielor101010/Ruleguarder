@@ -1,0 +1,69 @@
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api, ApiError } from "../api";
+import { DOC, report, violation } from "../test/fixtures";
+import { useDocumentReport } from "./useDocumentReport";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("useDocumentReport", () => {
+  it("does nothing without a selection", () => {
+    const spy = vi.spyOn(api, "latestReport");
+    const { result } = renderHook(() => useDocumentReport(null));
+    expect(result.current.document).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("loads the latest report", async () => {
+    const v = violation({ id: "1-0", block_id: 1, start: 23, end: 28 });
+    vi.spyOn(api, "latestReport").mockResolvedValue(report([v]));
+    const { result } = renderHook(() => useDocumentReport(1));
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.document).toEqual(DOC));
+    expect(result.current.violations).toEqual([v]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("falls back to the bare document when it was never checked", async () => {
+    vi.spyOn(api, "latestReport").mockRejectedValue(new ApiError(404, "not checked"));
+    vi.spyOn(api, "document").mockResolvedValue(DOC);
+    const { result } = renderHook(() => useDocumentReport(1));
+    await waitFor(() => expect(result.current.document).toEqual(DOC));
+    expect(result.current.violations).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
+
+  it("reports other load errors", async () => {
+    vi.spyOn(api, "latestReport").mockRejectedValue(new ApiError(500, "boom"));
+    const { result } = renderHook(() => useDocumentReport(1));
+    await waitFor(() => expect(result.current.error).toBe("boom"));
+  });
+
+  it("runs a check and keeps the document when the check fails", async () => {
+    vi.spyOn(api, "latestReport").mockRejectedValue(new ApiError(404, "not checked"));
+    vi.spyOn(api, "document").mockResolvedValue(DOC);
+    const check = vi.spyOn(api, "check").mockRejectedValueOnce(new ApiError(502, "All Gemini models are unavailable"));
+    const { result } = renderHook(() => useDocumentReport(1));
+    await waitFor(() => expect(result.current.document).toEqual(DOC));
+
+    await act(() => result.current.runCheck());
+    expect(result.current.error).toMatch(/unavailable/);
+    expect(result.current.document).toEqual(DOC);
+    expect(result.current.checking).toBe(false);
+
+    check.mockResolvedValueOnce(report([]));
+    await act(() => result.current.runCheck());
+    expect(result.current.violations).toEqual([]);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("resets when the selection changes", async () => {
+    vi.spyOn(api, "latestReport").mockResolvedValue(report([]));
+    const { result, rerender } = renderHook(({ id }) => useDocumentReport(id), { initialProps: { id: 1 as number | null } });
+    await waitFor(() => expect(result.current.document).not.toBeNull());
+    rerender({ id: null });
+    expect(result.current.document).toBeNull();
+  });
+});

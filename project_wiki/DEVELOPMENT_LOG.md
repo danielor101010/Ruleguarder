@@ -3,10 +3,20 @@
 Newest first. Branch chain so far (nothing merged into `dev` / `main` yet):
 
 ```
-dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-tests → fix/gemini-overload-fallback
+dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-tests → fix/gemini-overload-fallback → feature/quality-gates
 ```
 
 ---
+
+## 2026-09-29 – `feature/quality-gates`
+- **Server:** Ruff + strict mypy added; 8 lint and 31 type findings fixed. The rule registry is now typed per params model. `zip(strict=True)` in LLM result merging. Explicit `bool` in style resolution.
+- **Client:** ESLint 10 + `tsc --noEmit` + Vitest. 9 lint findings fixed:
+  - `setState` in effects (App, ReportView) → `useDocumentReport` hook + keyed `ReportView`
+  - non-null assertions → typed `SpanViolation`
+  - `void` generic in the API client → `requestNoContent`
+  - a dynamic heading tag flagged by the React Compiler → `createElement`
+- Logic extracted to `lib/highlight.ts`, `lib/layout.ts`, `hooks/useDocumentReport.ts`.
+- **Tests:** server 50 passed; client 32 passed (highlight segmentation incl. overlaps/clamping, table layout incl. merged cells, API client errors/204/network failure, report hook incl. the 404 → bare-document fallback and failed checks, ReportView highlight/click-to-scroll/counts).
 
 ## 2026-09-29 – `fix/gemini-overload-fallback`
 **Problem.** The real-Gemini E2E test took 154 s. Logs showed `gemini-3.8-flash` answering 503 "high demand" repeatedly, and each 503 took up to ~40 s to arrive. The retry policy (4 retries, 2 parallel calls) multiplied requests. About 21 real requests were spent during diagnosis, without asking the product owner first. That was a process mistake, now prevented by the changes below.
@@ -47,7 +57,6 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ## Open items
 - Real-LLM E2E rerun on `gemini-3.5-flash` (needs product-owner OK, since it spends quota).
-- Quality gates required by the wiki rules: Ruff + mypy (server), ESLint + Vitest (client), zero warnings.
 - UI redesign: the wiki's design system (glassmorphism, Tailwind) vs the earlier request (slate / dark navy dashboard). Needs a decision.
 - Severity rename to High / Medium / Low.
 - Rule templates: PII regex, acronym definitions, cross-references.

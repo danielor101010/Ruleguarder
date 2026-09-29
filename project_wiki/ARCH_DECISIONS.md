@@ -55,3 +55,13 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - Real-LLM tests never run by default (`addopts = -m "not llm"`); opt in with `pytest -m llm`.
 
 **Consequences.** Predictable quota use. A check can fail with "all models unavailable" when Google is overloaded; the error names each model and its status.
+
+## ADR-009 – Quality gates (Accepted, 2026-09-29)
+**Context.** The project wiki requires zero lint/type warnings and tests with every change.
+**Decision.**
+- Server: Ruff (`E,F,W,I,B,UP,SIM,RUF`, line length 120) + Ruff format + **mypy --strict** with the pydantic plugin (`server/pyproject.toml`). Test code relaxes `disallow_untyped_defs/calls` and `warn_return_any`, since fixtures don't need annotations. The `tests` image runs every gate: `ruff check && ruff format --check && mypy && pytest`.
+- Client: ESLint 10 flat config (`@eslint/js` recommended + `typescript-eslint` strict + `react-hooks` 7, including React Compiler rules) with `--max-warnings 0`; `tsc --noEmit`; Vitest + Testing Library + jsdom. `npm run check` runs all three.
+- Clean architecture: pure logic lives in `client/src/lib/` (`highlight.ts`, `layout.ts`) and data flow in hooks (`hooks/useDocumentReport.ts`); components render only.
+- No `setState` inside effects: selection resets happen during render (hook) or through a React `key` (`ReportView`).
+
+**Consequences.** jsdom is pinned to 25 because jsdom 26+ needs Node ≥ 24.15 (local Node is 24.11). One npm deprecation warning remains from a transitive jsdom dependency (`whatwg-encoding`), which is not our code.

@@ -66,7 +66,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build   # ap
 ## Tests
 
 ```bash
-docker compose --profile test run --rm tests     # unit + E2E against the running stack
+docker compose --profile test run --rm tests     # server: ruff, ruff format, mypy --strict, pytest (unit + E2E)
+cd client && npm run check                       # client: eslint (0 warnings), tsc, vitest
 ```
 
 - Unit tests: parser, rule types, LLM pipeline (fake provider), Gemini provider (mocked SDK)
