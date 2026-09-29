@@ -47,7 +47,7 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 - [x] Only 429 retried, `LLM_MAX_RETRIES=1`, `LLM_MAX_PARALLEL=1`, `LLM_TIMEOUT_SECONDS=120`
 - [x] Real-LLM tests opt-in only (`pytest -m llm`); bounded request count unit-tested
 - [x] Project wiki created (`project_wiki/`)
-- [!] Rerun real-LLM E2E on `gemini-3.5-flash` – only with your OK (spends quota)
+- [x] Real LLM checked by you on `gemini-3.5-flash`: works
 
 ## ✅ Quality gates (`feature/quality-gates`)
 - [x] Ruff + strict mypy (server), zero findings; `tests` image runs every gate
@@ -89,11 +89,9 @@ _6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --stri
 - [x] Tests: client 93 ✅, Playwright 5 passed / 1 skipped ✅
 
 ## Decisions for you
-- [!] `project_wiki/claude.md` §4 still prescribes glassmorphism; update it to the new dark style, or tell me to follow it
+- [x] `claude.md` §4: left as is (your call); ADR-014 records the dark design
 - [!] PII masking is cosmetic: full values stay in excerpts and stored documents (ADR-011). Mask excerpts? Retention/encryption for uploads?
-- [!] Confirm the design direction (glass panels on navy shell), or adjust
 - [!] Merge plan: these branches are stacked and not merged into `dev`. Open a PR / merge when you're ready
-- [!] Real-LLM E2E on `gemini-3.5-flash`: only with your OK (spends quota)
 
 ## Later
 - [ ] Decide on data sensitivity: free-tier Gemini may use submitted content (see `.env.example`)

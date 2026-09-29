@@ -10,6 +10,10 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – Product owner check
+- Real AI rules verified by the product owner on `gemini-3.5-flash`: working.
+- `claude.md` §4 stays as is (owner's decision); the app follows ADR-014.
+
 ## 2026-09-29 – `fix/dashboard-ux` (lead)
 **Feedback (product owner, with screenshots):** the layout and colours look bad, buttons don't look clickable, clicking a rule does nothing ("I need to see the rule in a pop-up"), coloured card side borders and blue paragraph rings look bad, no chips.
 **Changes** (see ADR-014):
@@ -107,7 +111,5 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 ---
 
 ## Open items
-- Real-LLM E2E rerun on `gemini-3.5-flash` (needs product-owner OK, since it spends quota).
-- UI design: opaque dark dashboard (ADR-014) departs from `claude.md` §4 glassmorphism; owner to update §4 or confirm.
 - PII data protection: masking is cosmetic (ADR-011). Decide on excerpt masking and document retention/encryption.
 - Multi-select input for array params (e.g. PII categories).
