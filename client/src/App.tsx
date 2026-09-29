@@ -37,7 +37,8 @@ export default function App() {
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-slate-950 lg:h-screen">
       <TopBar documentName={report.document?.filename ?? null} counts={counts} />
       <div className="grid flex-1 grid-cols-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[23rem_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto" aria-label="Rules and documents">
+        {/* On small screens the main area (upload / report) comes first */}
+        <aside className="order-2 flex flex-col gap-4 lg:order-none lg:min-h-0 lg:overflow-y-auto" aria-label="Rules and documents">
           <RulesPanel
             rules={rules.rules}
             types={rules.types}
@@ -68,7 +69,7 @@ export default function App() {
           />
         </aside>
 
-        <main className="flex min-w-0 flex-col gap-4 lg:min-h-0">
+        <main className="order-1 flex min-w-0 flex-col gap-4 lg:order-none lg:min-h-0">
           {report.error && <ErrorNote>{report.error}</ErrorNote>}
           {report.document ? (
             <ReportView

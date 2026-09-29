@@ -4,7 +4,7 @@ import { useViolationFocus } from "../hooks/useViolationFocus";
 import { violationsByBlock } from "../lib/highlight";
 import type { DocumentFull, Violation } from "../types";
 import DocumentPane from "./DocumentPane";
-import { AiQuotaBadge, Button, Panel } from "./ui";
+import { Button, Icon, Panel } from "./ui";
 import ViolationsPanel from "./ViolationsPanel";
 
 interface Props {
@@ -37,9 +37,9 @@ export default function ReportView({ document, violations, checking, checkedAt, 
           </p>
         </div>
         {aiRulesEnabled > 0 && (
-          <span className="flex items-center gap-2 text-xs text-slate-400">
-            <AiQuotaBadge />
-            {aiRulesEnabled} AI {aiRulesEnabled === 1 ? "rule" : "rules"} enabled
+          <span className="flex items-center gap-1.5 text-xs text-slate-400" title="AI rules are checked by the AI model">
+            <Icon name="sparkles" className="size-3.5 text-violet-300" />
+            {aiRulesEnabled} AI {aiRulesEnabled === 1 ? "rule" : "rules"} enabled · each check uses AI quota
           </span>
         )}
         <Button icon="play" onClick={onCheck} disabled={checking}>
