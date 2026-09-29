@@ -101,7 +101,8 @@ function BlockView({ block, byBlock, activeId, flash, onPick, registerBlock }: C
             tabIndex={0}
             className={cx(
               "rounded-sm px-0.5 underline decoration-2 underline-offset-4 transition-colors",
-              segActive ? "bg-zinc-900 text-white decoration-white" : cx("text-zinc-950", SEVERITY_CLASSES[severity].mark),
+              "text-zinc-950",
+              segActive ? cx("decoration-[3px]", SEVERITY_CLASSES[severity].active) : SEVERITY_CLASSES[severity].mark,
             )}
             title={tooltip(seg.violations)}
             onClick={(e) => {

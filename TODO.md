@@ -103,7 +103,7 @@ _6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --stri
 - [x] No dots, sparkles, ✓ or count pills; severity = text weight + highlight shade + underline style
 - [x] Active highlight inverts to black; errors = black-bordered note (no red)
 - [x] Tests: client 103 ✅ (ESLint 0 warnings, tsc clean); checked in the real app at desktop and phone width
-- [!] Want one accent colour back (e.g. red only for errors)? Say so; it's a two-file change
+- [x] Follow-up: dimmer background, small coloured severity dots, coloured document highlights
 
 ## Decisions for you (open)
 - [x] `claude.md` §4: left as is (your call); ADR-014 records the dark design

@@ -34,7 +34,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden bg-zinc-100 lg:h-screen">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-zinc-200 lg:h-screen">
       <TopBar documentName={report.document?.filename ?? null} counts={counts} />
       <div className="grid flex-1 grid-cols-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[23rem_minmax(0,1fr)]">
         {/* On small screens the main area (upload / report) comes first */}

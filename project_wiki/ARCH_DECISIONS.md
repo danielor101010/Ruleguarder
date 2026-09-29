@@ -210,3 +210,9 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - The severity filter is a segmented control: the selected segment is white and raised on a grey track.
 
 **Consequences.** Closer to `project_wiki/claude.md` §4 again (white panels, generous radii, dark pill buttons) but opaque: no translucent glass, which the owner rejected in ADR-014. Errors and high severity are no longer signalled by red; they rely on weight, borders, icons and wording. If the owner wants one accent colour back (e.g. red for errors only), it goes in `ui.tsx` (`Note`) and `lib/severity.ts`.
+
+**Amendment (same day, owner feedback: "too bright"; "add a really small coloured dot next to the level"; "here you can also put colour" on the document highlights):**
+- Dimmer chrome: app background `zinc-200`, panels and top bar `zinc-50` with a `zinc-300/70` border. Cards, dialogs and the document page stay white.
+- A 6 px coloured dot (`SeverityDot`) sits before every severity label: High `red-500`, Medium `orange-400`, Low `yellow-400`. The labels themselves stay grey.
+- Document highlights are coloured tints again (`red/orange/yellow-100`) and keep the solid / dashed / dotted underline. The active highlight is a deeper tint (`-200`) with a thicker underline, not black. Whole-block flags use `-50` tints.
+- Everything else (buttons, switches, notes, selection borders) stays monochrome.

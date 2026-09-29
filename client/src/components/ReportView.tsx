@@ -58,7 +58,7 @@ export default function ReportView({
       </Panel>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Panel as="article" aria-label="Document" className="min-h-0 bg-zinc-50 p-3 sm:p-5 lg:overflow-y-auto">
+        <Panel as="article" aria-label="Document" className="min-h-0 bg-zinc-100 p-3 sm:p-5 lg:overflow-y-auto">
           {/* The document is shown as a white page for readability */}
           <div className="mx-auto max-w-3xl rounded-2xl border border-zinc-200 bg-white px-5 py-8 text-zinc-900 shadow-sm sm:px-10">
             <DocumentPane

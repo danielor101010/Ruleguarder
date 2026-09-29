@@ -10,6 +10,11 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `feature/monochrome-ui` (follow-up)
+- Owner feedback: too bright; wants a small coloured dot per level and colour in the document highlights (ADR-017 amendment).
+- Grey app background and off-white panels. 6 px severity dots (red / orange / yellow) in labels, top-bar counts and the filter. Coloured highlight tints with the underline styles kept; the active highlight deepens its tint.
+- **Tests:** client 103 passed. The severity test now checks that colour appears only in dots and highlights, and that the active highlight differs from the normal one.
+
 ## 2026-09-29 – `feature/monochrome-ui`
 - Redesign on the product owner's request: no colours and no dots (ADR-017).
 - Light monochrome theme (zinc greys, white panels, black pill buttons). Severity is shown by text weight, highlight shade and underline style (solid / dashed / dotted). The active highlight inverts to black.

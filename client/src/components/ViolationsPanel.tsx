@@ -1,7 +1,7 @@
 import { cx, SEVERITY_LABEL } from "../lib/severity";
 import { isDocumentLevel, type RuleOption } from "../lib/violations";
 import { SEVERITIES, type Severity, type Violation } from "../types";
-import { Button, SeverityBadge } from "./ui";
+import { Button, SeverityBadge, SeverityDot } from "./ui";
 
 interface Props {
   /** Already filtered, document-level first. */
@@ -38,7 +38,7 @@ export default function ViolationsPanel({
   return (
     <div className="flex flex-col gap-3">
       <div
-        className="grid grid-cols-3 gap-1 rounded-full bg-zinc-100 p-1"
+        className="grid grid-cols-3 gap-1 rounded-full bg-zinc-200/70 p-1"
         role="group"
         aria-label="Filter by severity"
       >
@@ -50,6 +50,7 @@ export default function ViolationsPanel({
             onClick={() => onToggleSeverity(s)}
             className="inline-flex items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-xs font-semibold text-zinc-400 transition-colors hover:text-zinc-900 aria-pressed:bg-white aria-pressed:text-zinc-900 aria-pressed:shadow-sm"
           >
+            <SeverityDot severity={s} />
             {SEVERITY_LABEL[s]}
             <span className="tabular-nums">{counts[s] ?? 0}</span>
           </button>

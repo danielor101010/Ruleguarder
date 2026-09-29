@@ -111,7 +111,7 @@ export function Panel({
 }) {
   return (
     <Tag
-      className={cx("rounded-3xl border border-zinc-200 bg-white text-zinc-900 shadow-sm", className)}
+      className={cx("rounded-3xl border border-zinc-300/70 bg-zinc-50 text-zinc-900 shadow-sm", className)}
       {...rest}
     >
       {children}
@@ -287,10 +287,16 @@ export const inputClass =
 
 /* ------------------------------------------------------------------ labels & notes */
 
-/** Plain severity label: uppercase text whose weight and shade follow the severity. No dot, no chip. */
+/** Small coloured marker: the only colour in the UI (ADR-017). */
+export function SeverityDot({ severity }: { severity: Severity }) {
+  return <span aria-hidden="true" className={cx("inline-block size-1.5 shrink-0 rounded-full", SEVERITY_CLASSES[severity].dot)} />;
+}
+
+/** Severity label: small dot + uppercase text whose weight and shade follow the severity. No chip. */
 export function SeverityBadge({ severity }: { severity: Severity }) {
   return (
-    <span className={cx("text-[0.7rem] tracking-wider uppercase", SEVERITY_CLASSES[severity].text)}>
+    <span className={cx("inline-flex items-center gap-1.5 text-[0.7rem] tracking-wider uppercase", SEVERITY_CLASSES[severity].text)}>
+      <SeverityDot severity={severity} />
       {SEVERITY_LABEL[severity]}
     </span>
   );

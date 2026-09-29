@@ -47,8 +47,8 @@ describe("ReportView", () => {
     const mark = screen.getByText("50 km");
     expect(mark.tagName).toBe("MARK");
     expect(mark).toHaveAttribute("data-severity", "high");
-    // Monochrome: severity shows as shade + underline style, not hue (ADR-017)
-    expect(mark).toHaveClass("bg-zinc-300", "decoration-solid");
+    // Severity shows as a colour tint plus an underline style that reads without colour (ADR-017)
+    expect(mark).toHaveClass("bg-red-100", "decoration-solid");
     expect(mark).toHaveAttribute("title", "No figures: Reveals range");
   });
 
@@ -124,12 +124,12 @@ describe("ReportView", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "nearest" });
   });
 
-  it("inverts the active highlight to black instead of its severity shade", async () => {
+  it("deepens the active highlight's tint", async () => {
     setup();
     const mark = screen.getByText("50 km");
     await userEvent.click(mark);
-    expect(mark).toHaveClass("bg-zinc-900", "text-white");
-    expect(mark).not.toHaveClass("bg-zinc-300");
+    expect(mark).toHaveClass("bg-red-200", "decoration-solid");
+    expect(mark).not.toHaveClass("bg-red-100");
   });
 
   it("highlights are keyboard accessible", async () => {
