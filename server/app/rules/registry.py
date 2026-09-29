@@ -18,15 +18,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from ..schemas import Block, Run
-
-
-@dataclass
-class Finding:
-    message: str
-    block_id: int | None = None
-    start: int | None = None
-    end: int | None = None
-
+from .finding import Finding
 
 # Each checker takes its own params model; the registry pairs them via RuleType.params_model
 Checker = Callable[[Any, list[Block]], Iterable[Finding]]

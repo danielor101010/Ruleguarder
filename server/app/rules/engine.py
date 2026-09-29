@@ -4,8 +4,9 @@ from typing import Any
 from ..llm import LlmProvider, LlmRule
 from ..models import Rule
 from ..schemas import Block, ReportSummary, Violation
+from .finding import Finding
 from .llm_check import check_llm_rules
-from .registry import LLM_RULE_TYPE, RULE_TYPES, Finding
+from .registry import LLM_RULE_TYPE, RULE_TYPES
 
 _EXCERPT_CONTEXT = 40
 
