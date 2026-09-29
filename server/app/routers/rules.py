@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import Rule
 from ..rules import RULE_TYPES, RuleValidationError, validate_rule_params
-from ..schemas import RuleCreate, RuleOut, RuleTypeOut, RuleUpdate
+from ..rules.templates import RULE_TEMPLATES
+from ..schemas import RuleCreate, RuleOut, RuleTemplate, RuleTypeOut, RuleUpdate, SampleRulesResult
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 
@@ -25,6 +26,32 @@ def list_rule_types() -> list[RuleTypeOut]:
     ]
 
 
+# Static paths are declared before the "/{rule_id}" routes so they are never taken for an id.
+@router.get("/templates", response_model=list[RuleTemplate])
+def list_rule_templates() -> list[RuleTemplate]:
+    return RULE_TEMPLATES
+
+
+@router.post("/samples", response_model=SampleRulesResult, status_code=status.HTTP_201_CREATED)
+def create_sample_rules(db: Session = Depends(get_db)) -> SampleRulesResult:
+    """Create every sample-set template. Idempotent: a rule whose name already exists is skipped."""
+    existing = set(db.scalars(select(Rule.name)))
+    created: list[Rule] = []
+    skipped: list[str] = []
+    for template in RULE_TEMPLATES:
+        if not template.in_sample_set:
+            continue
+        if template.rule.name in existing:
+            skipped.append(template.rule.name)
+            continue
+        rule = _new_rule(template.rule)
+        db.add(rule)
+        created.append(rule)
+        existing.add(rule.name)
+    db.commit()
+    return SampleRulesResult(created=[RuleOut.model_validate(r) for r in created], skipped=skipped)
+
+
 @router.get("", response_model=list[RuleOut])
 def list_rules(db: Session = Depends(get_db)) -> list[Rule]:
     return list(db.scalars(select(Rule).order_by(Rule.id)))
@@ -32,9 +59,7 @@ def list_rules(db: Session = Depends(get_db)) -> list[Rule]:
 
 @router.post("", response_model=RuleOut, status_code=status.HTTP_201_CREATED)
 def create_rule(body: RuleCreate, db: Session = Depends(get_db)) -> Rule:
-    data = body.model_dump()
-    data["params"] = _validated(body.type, body.params)
-    rule = Rule(**data)
+    rule = _new_rule(body)
     db.add(rule)
     db.commit()
     return rule
@@ -56,6 +81,12 @@ def update_rule(rule_id: int, body: RuleUpdate, db: Session = Depends(get_db)) -
 def delete_rule(rule_id: int, db: Session = Depends(get_db)) -> None:
     db.delete(_get_or_404(db, rule_id))
     db.commit()
+
+
+def _new_rule(body: RuleCreate) -> Rule:
+    data = body.model_dump()
+    data["params"] = _validated(body.type, body.params)
+    return Rule(**data)
 
 
 def _validated(rule_type: str, params: dict[str, Any]) -> dict[str, Any]:

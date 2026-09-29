@@ -85,6 +85,25 @@ class RuleTypeOut(BaseModel):
     params_schema: dict[str, Any]
 
 
+TemplateCategory = Literal["security", "privacy", "style", "structure", "ai"]
+
+
+class RuleTemplate(BaseModel):
+    """A ready-made rule the user can add as is, or edit first."""
+
+    id: str  # stable slug, e.g. "pii-all"
+    label: str
+    description: str
+    category: TemplateCategory
+    in_sample_set: bool = False
+    rule: RuleCreate  # ready to POST /api/rules
+
+
+class SampleRulesResult(BaseModel):
+    created: list[RuleOut]
+    skipped: list[str]  # names of sample rules that already existed
+
+
 # ---------- Documents & reports ----------
 
 
