@@ -14,9 +14,10 @@ def get_llm_provider() -> LlmProvider:
 
         return GeminiProvider(
             api_key=settings.gemini_api_key,
-            model=settings.llm_model,
+            models=settings.llm_models,
             max_output_tokens=settings.llm_max_tokens,
             temperature=settings.llm_temperature,
             max_retries=settings.llm_max_retries,
+            timeout_seconds=settings.llm_timeout_seconds,
         )
     raise LlmError(f"Unknown LLM_PROVIDER '{settings.llm_provider}'")

@@ -2,7 +2,8 @@
 
     docker compose --profile test run --rm tests
 
-The LLM test runs only when GEMINI_API_KEY holds a real key.
+The real-LLM test spends API quota, so it never runs by default. Opt in with:
+    docker compose --profile test run --rm tests pytest -m llm
 """
 
 import os

@@ -17,20 +17,29 @@ class Settings(BaseSettings):
     # LLM
     llm_provider: str = "gemini"
     gemini_api_key: str | None = None
-    llm_model: str = "gemini-3.8-flash"
+    llm_model: str = "gemini-3.5-flash"
+    # Comma-separated models tried in order when LLM_MODEL is overloaded (503/504/timeout).
+    # Empty by default: every fallback attempt is another request against your quota.
+    llm_fallback_models: str = ""
     llm_max_tokens: int = 32000
     # None => the model's default temperature
     llm_temperature: float | None = None
-    # Retries on rate limit (429) / server errors, with exponential backoff
-    llm_max_retries: int = 4
+    # Retries per model on rate limit (429). Each retry is an extra request.
+    llm_max_retries: int = 1
+    llm_timeout_seconds: float = 120
     # Documents longer than this are split into several LLM calls
     llm_chunk_chars: int = 60000
     # Keep low on the free tier: parallel calls count against the per-minute quota
-    llm_max_parallel: int = 2
+    llm_max_parallel: int = 1
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def llm_models(self) -> list[str]:
+        fallbacks = [m.strip() for m in self.llm_fallback_models.split(",") if m.strip()]
+        return [self.llm_model, *(m for m in fallbacks if m != self.llm_model)]
 
     @property
     def max_upload_bytes(self) -> int:
