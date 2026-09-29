@@ -14,7 +14,8 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 | `refactor/severity-levels` | `feature/quality-gates` | ✅ committed (+ spec for next two) |
 | `feature/rule-templates` | `refactor/severity-levels` | ✅ done, verified (154 tests) |
 | `feature/dashboard-ui` | `refactor/severity-levels` | ✅ done (subagent 2) |
-| `feature/templates-dashboard-integration` | both of the above | ✅ merged + verified (current branch) |
+| `feature/templates-dashboard-integration` | both of the above | ✅ merged + verified |
+| `fix/dashboard-ux` | `feature/templates-dashboard-integration` | ✅ UI redesign from your feedback (current branch) |
 
 ## ✅ Phase 1 – Scaffold (`feature/project-scaffold`)
 - [x] Stack: FastAPI + python-docx + PostgreSQL + React/Vite/TS + Docker (nginx)
@@ -79,7 +80,16 @@ _6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --stri
 - [x] Wiki: ADR-011/012/013, dev log, API contracts, prompt playbook; README
 - [x] Your app on :8080 updated to this version (your rules kept)
 
+## ✅ UI fix (`fix/dashboard-ux`)
+- [x] Opaque dark dashboard, document as a white page (no muddy translucent panels)
+- [x] Click a rule → details pop-up (full rule, severity, on/off, edit, delete)
+- [x] Clear buttons: indigo primary, bordered secondary, icon buttons, switches, delete confirmation
+- [x] No coloured side borders, no blue rings, no chips
+- [x] Upload drop zone + recent documents; phone layout puts the main area first
+- [x] Tests: client 93 ✅, Playwright 5 passed / 1 skipped ✅
+
 ## Decisions for you
+- [!] `project_wiki/claude.md` §4 still prescribes glassmorphism; update it to the new dark style, or tell me to follow it
 - [!] PII masking is cosmetic: full values stay in excerpts and stored documents (ADR-011). Mask excerpts? Retention/encryption for uploads?
 - [!] Confirm the design direction (glass panels on navy shell), or adjust
 - [!] Merge plan: these branches are stacked and not merged into `dev`. Open a PR / merge when you're ready

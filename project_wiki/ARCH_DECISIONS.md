@@ -89,7 +89,7 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
   - Word SEQ caption fields are not in the parsed text (caption position is used instead).
 - ⚠️ **PII masking is cosmetic, not data protection** (found in integration review). The violation **message** is masked (`•••• 1111`), but the **excerpt** and the stored document blocks contain the full value, and both are kept in the DB and shown in the UI. Protecting stored PII would need excerpt masking plus encryption or retention rules for documents: **open decision for the product owner**.
 
-## ADR-012 – Dashboard UI: Tailwind v4 tokens, glass surfaces, hook/lib split (Accepted, 2026-09-29)
+## ADR-012 – Dashboard UI: Tailwind v4 tokens, glass surfaces, hook/lib split (Accepted, 2026-09-29; surfaces superseded by ADR-014)
 **Context.** The spec asks for a dark dashboard with glass surfaces, a split-screen report, filters and click-to-locate, and template/sample features built in parallel with their endpoints.
 **Decision.**
 - Tailwind CSS v4 via `@tailwindcss/vite` (its peer range covers Vite 5; no PostCSS or `tailwind.config.js`). Tokens live in the `styles.css` `@theme`: accent `#0F172A`, `navy-950`, the severity colours (ADR-010), `animate-flash` (1.5 s). Per-severity class sets are literal strings in `lib/severity.ts` so Tailwind's scanner finds them.
@@ -110,3 +110,31 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - The lead verifies each branch independently (fresh DB, all gates), merges into an integration branch, runs every gate together in a separate worktree, reviews screenshots, and writes the wiki.
 
 **Consequences.** Integration found issues neither agent could see alone: a Playwright locator built from an unescaped label, and the PII masking overstatement. Both agents' worktrees started at the initial commit instead of the intended base; both noticed and branched from the right commit, so the lead should check the base on every hand-back.
+
+## ADR-014 – Opaque dark dashboard, dialogs for rules, no chips (Accepted, 2026-09-29; supersedes the surface part of ADR-012)
+**Context.** Product-owner review of the ADR-012 UI:
+- translucent white panels (`bg-white/70`) over navy rendered as muddy grey with weak contrast;
+- the layout left the main area mostly empty;
+- Edit/Delete were plain coloured text and pill buttons didn't read as clickable;
+- clicking a rule did nothing;
+- follow-ups: thick coloured side borders on cards and blue rings around paragraphs looked bad, and pill "chips" (e.g. "AI · uses quota") are not wanted.
+
+**Decision.**
+- **Surfaces:** opaque dark slate (`slate-950` app, `slate-900` panels, `slate-800` borders and rows). The document is a **white page** inside its panel, for reading comfort. No translucent white.
+- **Affordances:**
+  - indigo primary buttons (`indigo-500`), bordered secondary buttons, icon buttons with tooltips;
+  - every interactive element has a hover state;
+  - on/off **switches** instead of checkboxes;
+  - delete is two-step (Delete → Confirm / Keep).
+- **Rules:**
+  - every rule row is a button that opens a **details dialog**: full instruction or settings, severity, enable switch, Edit, Delete;
+  - create/edit and the template picker are dialogs too;
+  - the `Modal` is accessible: focus moves in, Tab is trapped, Escape/backdrop close it, focus returns to the opener.
+- **No decoration borders:**
+  - violation cards have no coloured side border; severity is a dot + label;
+  - the selected card and paragraph use a soft indigo tint;
+  - the flash is a background fade with no ring.
+- **No chips:** AI and severity markers are plain text + icon/dot; the top-bar counters are plain; the severity filter is one segmented control.
+- **Empty state:** drag-and-drop upload zone + recent documents. On phones the main area comes before the sidebar.
+
+**Consequences.** ⚠️ This departs from `project_wiki/claude.md` §4 (glassmorphism, `bg-white/70` panels, dark `#0F172A` pill buttons), based on the product owner's direct feedback. `claude.md` is the owner's rules file and was **not** edited; the owner should update §4 or confirm the exception.

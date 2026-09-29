@@ -10,6 +10,24 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `fix/dashboard-ux` (lead)
+**Feedback (product owner, with screenshots):** the layout and colours look bad, buttons don't look clickable, clicking a rule does nothing ("I need to see the rule in a pop-up"), coloured card side borders and blue paragraph rings look bad, no chips.
+**Changes** (see ADR-014):
+- opaque dark UI with the document on a white page;
+- rule details dialog; create/edit and template picker as dialogs;
+- indigo primary, bordered secondary and icon buttons; switches; two-step delete;
+- soft tints instead of borders and rings; plain text instead of chips; segmented severity filter;
+- upload drop zone + recent documents; phone order: main area first.
+
+**Tests:**
+- client: **93 passed** (+7: rule details dialog incl. full instruction, settings, edit/toggle/delete from the dialog, delete confirmation, Escape + focus return, file-size formatting); ESLint 0 warnings; build ✅
+- Playwright on a throwaway stack: **5 passed, 1 skipped** (expected)
+
+**Notes:**
+- A11y fix found by tests: the details dialog had two buttons named "Close"; the footer one was removed.
+- A Playwright run first failed 3 tests because demo data left AI rules enabled; the E2E quota guard refused to check (working as intended).
+- Screenshots were reviewed at 1600 px and 390 px. The user's app on :8080 was rebuilt.
+
 ## 2026-09-29 – `feature/templates-dashboard-integration` (lead)
 - Merged `feature/rule-templates` and `feature/dashboard-ui` (no conflicts).
 - **Verification:** templates branch re-run by the lead on a fresh DB (154 passed). Integrated stack in a separate worktree with a placeholder key:
@@ -90,6 +108,6 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ## Open items
 - Real-LLM E2E rerun on `gemini-3.5-flash` (needs product-owner OK, since it spends quota).
-- UI design: combined as glass panels on a slate/navy shell (ADR-012). Product owner to confirm.
+- UI design: opaque dark dashboard (ADR-014) departs from `claude.md` §4 glassmorphism; owner to update §4 or confirm.
 - PII data protection: masking is cosmetic (ADR-011). Decide on excerpt masking and document retention/encryption.
 - Multi-select input for array params (e.g. PII categories).
