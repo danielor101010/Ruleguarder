@@ -94,13 +94,17 @@ def test_long_documents_are_chunked(sample_blocks, monkeypatch):
 )
 def test_find_span_normalises(quote):
     text = "The detection range is 50 “km” at sea."
-    start, end = find_span(text, quote)
+    span = find_span(text, quote)
+    assert span is not None
+    start, end = span
     assert text[start:end] == "range is 50 “km”"
 
 
 def test_find_span_hebrew_gershayim():
     text = "טווח הגילוי המירבי הוא 50 ק״מ."
-    start, end = find_span(text, 'הוא 50 ק"מ')
+    span = find_span(text, 'הוא 50 ק"מ')
+    assert span is not None
+    start, end = span
     assert text[start:end] == "הוא 50 ק״מ"
 
 

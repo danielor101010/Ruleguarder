@@ -1,0 +1,31 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+    "B008",  # FastAPI's Depends() in defaults is the documented pattern
+]
+
+[tool.ruff.lint.per-file-ignores]
+"app/rules/llm_check.py" = ["RUF001"]  # look-alike characters are the point of the normalisation map
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["docx.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+# Test functions take pytest fixtures; annotating every one adds noise, not safety
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_any_generics = false
+warn_return_any = false

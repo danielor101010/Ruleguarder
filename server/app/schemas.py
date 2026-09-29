@@ -9,6 +9,7 @@ BlockKind = Literal["paragraph", "heading", "table_cell"]
 
 # ---------- Parsed document ----------
 
+
 class Run(BaseModel):
     """A contiguous piece of text with uniform formatting. Offsets are into Block.text."""
 
@@ -39,6 +40,7 @@ class Block(BaseModel):
 
 
 # ---------- Rules ----------
+
 
 class RuleBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -76,6 +78,7 @@ class RuleTypeOut(BaseModel):
 
 
 # ---------- Documents & reports ----------
+
 
 class DocumentSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)

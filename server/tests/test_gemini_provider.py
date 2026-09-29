@@ -15,7 +15,9 @@ RULES = [LlmRule(3, "No figures", "No performance numbers")]
 BLOCKS = [LlmBlock(0, "Paragraph 1", "Range is 50 km.")]
 
 
-def response(payload: dict[str, Any] | str, finish: types.FinishReason = types.FinishReason.STOP) -> types.GenerateContentResponse:
+def response(
+    payload: dict[str, Any] | str, finish: types.FinishReason = types.FinishReason.STOP
+) -> types.GenerateContentResponse:
     text = payload if isinstance(payload, str) else json.dumps(payload)
     return types.GenerateContentResponse(
         candidates=[
@@ -35,9 +37,14 @@ EMPTY = response({"violations": []})
 
 
 def make_provider(monkeypatch: pytest.MonkeyPatch, models: list[str], max_retries: int = 1) -> GeminiProvider:
-    monkeypatch.setattr(gemini_provider.time, "sleep", lambda _: None)
+    monkeypatch.setattr("app.llm.gemini_provider.time.sleep", lambda _: None)
     return GeminiProvider(
-        api_key="test", models=models, max_output_tokens=1000, temperature=None, max_retries=max_retries, timeout_seconds=30
+        api_key="test",
+        models=models,
+        max_output_tokens=1000,
+        temperature=None,
+        max_retries=max_retries,
+        timeout_seconds=30,
     )
 
 
@@ -62,10 +69,14 @@ def test_parses_structured_output(monkeypatch):
     calls = mock_generate(
         monkeypatch,
         provider,
-        response({"violations": [
-            {"rule_id": 3, "block_id": 0, "quote": "50 km", "explanation": "range"},
-            {"rule_id": 3, "block_id": -1, "quote": "", "explanation": "doc level"},
-        ]}),
+        response(
+            {
+                "violations": [
+                    {"rule_id": 3, "block_id": 0, "quote": "50 km", "explanation": "range"},
+                    {"rule_id": 3, "block_id": -1, "quote": "", "explanation": "doc level"},
+                ]
+            }
+        ),
     )
     result = provider.find_violations(RULES, BLOCKS)
     assert [(v.rule_id, v.block_id, v.quote) for v in result] == [(3, 0, "50 km"), (3, None, "")]
@@ -147,7 +158,9 @@ def test_invalid_json(monkeypatch):
 
 def test_missing_api_key():
     with pytest.raises(LlmError, match="GEMINI_API_KEY"):
-        GeminiProvider(api_key=None, models=["m"], max_output_tokens=10, temperature=None, max_retries=0, timeout_seconds=1)
+        GeminiProvider(
+            api_key=None, models=["m"], max_output_tokens=10, temperature=None, max_retries=0, timeout_seconds=1
+        )
 
 
 def test_model_list_from_settings():

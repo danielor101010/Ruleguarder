@@ -13,10 +13,11 @@ COPY app ./app
 
 # Test image: unit tests + E2E tests against the running stack
 FROM base AS test
-COPY requirements-dev.txt pytest.ini ./
+COPY requirements-dev.txt pytest.ini pyproject.toml ./
 RUN pip install -r requirements-dev.txt
 COPY tests ./tests
-CMD ["pytest", "-v"]
+# All quality gates: lint, formatting, types, tests
+CMD ["sh", "-c", "ruff check . && ruff format --check . && mypy && pytest -v"]
 
 FROM base AS prod
 

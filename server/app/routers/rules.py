@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -56,7 +58,7 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db)) -> None:
     db.commit()
 
 
-def _validated(rule_type: str, params: dict) -> dict:
+def _validated(rule_type: str, params: dict[str, Any]) -> dict[str, Any]:
     try:
         return validate_rule_params(rule_type, params)
     except RuleValidationError as exc:

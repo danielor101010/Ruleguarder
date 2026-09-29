@@ -110,7 +110,10 @@ def _paragraph_to_block(
                 end=offset + len(text),
                 text=text,
                 font=r.font.name or _style_attr(r.style, "name") or _style_attr(p.style, "name") or defaults["font"],
-                size_pt=_to_pt(r.font.size) or _to_pt(_style_attr(r.style, "size")) or _to_pt(_style_attr(p.style, "size")) or defaults["size_pt"],
+                size_pt=_to_pt(r.font.size)
+                or _to_pt(_style_attr(r.style, "size"))
+                or _to_pt(_style_attr(p.style, "size"))
+                or defaults["size_pt"],
                 bold=_resolve_bool(r.font.bold, r.style, p.style, "bold"),
                 italic=_resolve_bool(r.font.italic, r.style, p.style, "italic"),
             )
@@ -156,7 +159,9 @@ def _resolve_bool(direct: bool | None, run_style: Any, para_style: Any, attr: st
     if direct is not None:
         return direct
     value = _style_attr(run_style, attr)
-    return value if value is not None else _style_attr(para_style, attr)
+    if value is None:
+        value = _style_attr(para_style, attr)
+    return None if value is None else bool(value)
 
 
 def _to_pt(length: Any) -> float | None:

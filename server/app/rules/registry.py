@@ -13,10 +13,11 @@ so no client change is needed.
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from ..schemas import Block
+from ..schemas import Block, Run
 
 
 @dataclass
@@ -27,7 +28,8 @@ class Finding:
     end: int | None = None
 
 
-Checker = Callable[[BaseModel, list[Block]], Iterable[Finding]]
+# Each checker takes its own params model; the registry pairs them via RuleType.params_model
+Checker = Callable[[Any, list[Block]], Iterable[Finding]]
 
 
 @dataclass
@@ -42,11 +44,12 @@ class RuleType:
 
 # ---------- params models ----------
 
+
 class LlmParams(BaseModel):
     instruction: str = Field(
         min_length=3,
         title="Rule (in plain language)",
-        description="What is not allowed / required, e.g. \"No numeric figures that reveal the "
+        description='What is not allowed / required, e.g. "No numeric figures that reveal the '
         "system's performance (ranges, speeds, accuracy...)\".",
         json_schema_extra={"format": "textarea"},
     )
@@ -138,11 +141,11 @@ def _check_max_paragraph_words(params: MaxWordsParams, blocks: list[Block]) -> I
 
 
 def _merge_run_findings(
-    blocks: list[Block], bad_value: Callable[[object], object | None], describe: Callable[[object], str]
+    blocks: list[Block], bad_value: Callable[[Run], Any], describe: Callable[[Any], str]
 ) -> Iterable[Finding]:
     """Emit one finding per stretch of consecutive runs sharing the same offending value."""
     for block in blocks:
-        span: tuple[int, int, object] | None = None
+        span: tuple[int, int, Any] | None = None
         for run in block.runs:
             value = bad_value(run) if run.text.strip() else None
             if span and value is not None and value == span[2] and run.start == span[1]:
@@ -168,9 +171,9 @@ def _check_allowed_fonts(params: AllowedFontsParams, blocks: list[Block]) -> Ite
 def _check_font_size_range(params: FontSizeRangeParams, blocks: list[Block]) -> Iterable[Finding]:
     return _merge_run_findings(
         blocks,
-        lambda run: run.size_pt
-        if run.size_pt is not None and not (params.min_pt <= run.size_pt <= params.max_pt)
-        else None,
+        lambda run: (
+            run.size_pt if run.size_pt is not None and not (params.min_pt <= run.size_pt <= params.max_pt) else None
+        ),
         lambda size: f"Font size {size}pt is outside {params.min_pt}-{params.max_pt}pt",
     )
 

@@ -16,19 +16,27 @@ from .registry import Finding
 # Characters the model may silently swap (Hebrew gershayim/geresh vs ASCII quotes, dashes, NBSP...)
 _EQUIVALENT = str.maketrans(
     {
-        "״": '"', "“": '"', "”": '"', "„": '"',  # gershayim, curly quotes
-        "׳": "'", "‘": "'", "’": "'", "`": "'",  # geresh, curly apostrophes
-        "–": "-", "—": "-", "־": "-",  # en/em dash, maqaf
+        "״": '"',
+        "“": '"',
+        "”": '"',
+        "„": '"',  # gershayim, curly quotes
+        "׳": "'",
+        "‘": "'",
+        "’": "'",
+        "`": "'",  # geresh, curly apostrophes
+        "–": "-",
+        "—": "-",
+        "־": "-",  # en/em dash, maqaf
         " ": " ",  # no-break space
-        "‏": "", "‎": "", "​": "",  # RLM, LRM, zero-width space
+        "‏": "",
+        "‎": "",
+        "​": "",  # RLM, LRM, zero-width space
     }
 )
 _WS = re.compile(r"\s+")
 
 
-def check_llm_rules(
-    provider: LlmProvider, rules: list[LlmRule], blocks: list[Block]
-) -> dict[int, list[Finding]]:
+def check_llm_rules(provider: LlmProvider, rules: list[LlmRule], blocks: list[Block]) -> dict[int, list[Finding]]:
     """Returns findings grouped by rule id."""
     settings = get_settings()
     llm_blocks = [LlmBlock(b.id, b.label, b.text) for b in blocks if b.text.strip()]
@@ -43,7 +51,7 @@ def check_llm_rules(
     seen: set[tuple[int, int | None, int | None, int | None]] = set()
     doc_level_reported: set[int] = set()
 
-    for chunk, violations in zip(chunks, results):
+    for chunk, violations in zip(chunks, results, strict=True):
         chunk_ids = [b.id for b in chunk]
         for v in violations:
             if v.rule_id not in rule_ids:

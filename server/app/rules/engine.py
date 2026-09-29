@@ -25,9 +25,7 @@ def validate_rule_params(rule_type: str, params: dict[str, Any]) -> dict[str, An
         raise RuleValidationError(str(exc)) from exc
 
 
-def run_rules(
-    rules: list[Rule], blocks: list[Block], llm: LlmProvider | None
-) -> tuple[list[Violation], ReportSummary]:
+def run_rules(rules: list[Rule], blocks: list[Block], llm: LlmProvider | None) -> tuple[list[Violation], ReportSummary]:
     """Run every rule against the document. Raises LlmError if the LLM call fails."""
     findings: dict[int, list[Finding]] = {}
 

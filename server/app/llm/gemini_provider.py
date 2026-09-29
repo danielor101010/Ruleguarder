@@ -119,9 +119,7 @@ class GeminiProvider:
             for attempt in range(self._max_retries + 1):
                 started = time.monotonic()
                 try:
-                    response = self._client.models.generate_content(
-                        model=model, contents=prompt, config=self._config
-                    )
+                    response = self._client.models.generate_content(model=model, contents=prompt, config=self._config)
                     log.info("Gemini %s answered in %.1fs", model, time.monotonic() - started)
                     return response
                 except errors.APIError as exc:

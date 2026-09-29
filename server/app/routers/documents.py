@@ -83,9 +83,7 @@ def delete_document(document_id: int, db: Session = Depends(get_db)) -> None:
 
 
 @router.post("/{document_id}/check", response_model=ReportOut)
-def check_document(
-    document_id: int, body: CheckRequest | None = None, db: Session = Depends(get_db)
-) -> ReportOut:
+def check_document(document_id: int, body: CheckRequest | None = None, db: Session = Depends(get_db)) -> ReportOut:
     """Run rules against the document and store the report.
 
     Sync handler on purpose: FastAPI runs it in a worker thread, so a long LLM call

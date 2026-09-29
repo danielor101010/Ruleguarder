@@ -75,7 +75,9 @@ def test_rule_types_exposed(api):
 
 
 def test_invalid_rule_rejected(api):
-    res = api.post("/api/rules", json={"name": "bad", "type": "forbidden_text", "params": {"pattern": "(", "is_regex": True}})
+    res = api.post(
+        "/api/rules", json={"name": "bad", "type": "forbidden_text", "params": {"pattern": "(", "is_regex": True}}
+    )
     assert res.status_code == 422
 
 
@@ -85,8 +87,12 @@ def test_upload_rejects_non_docx(api):
 
 
 def test_full_flow_with_deterministic_rules(api, created, sample_docx):
-    forbidden = create_rule(api, created, name="No classification markings", type="forbidden_text", params={"pattern": "top secret"})
-    fonts = create_rule(api, created, name="Calibri only", type="allowed_fonts", params={"fonts": ["Calibri"]}, severity="warning")
+    forbidden = create_rule(
+        api, created, name="No classification markings", type="forbidden_text", params={"pattern": "top secret"}
+    )
+    fonts = create_rule(
+        api, created, name="Calibri only", type="allowed_fonts", params={"fonts": ["Calibri"]}, severity="warning"
+    )
 
     doc = upload(api, created, sample_docx)
     assert any(b["text"] == INTRO for b in doc["blocks"])
@@ -95,7 +101,7 @@ def test_full_flow_with_deterministic_rules(api, created, sample_docx):
     assert api.get(f"/api/documents/{doc['id']}/report").status_code == 404
 
     report = check(api, doc["id"], [forbidden["id"], fonts["id"]])
-    by_rule = {}
+    by_rule: dict[int, list[dict]] = {}
     for v in report["violations"]:
         by_rule.setdefault(v["rule_id"], []).append(v)
 
@@ -124,8 +130,10 @@ def test_llm_rule_finds_performance_figures(api, created, sample_docx):
         created,
         name="No performance figures",
         type="llm",
-        params={"instruction": "The document must not contain numeric figures that reveal the system's "
-                "performance, such as detection range, accuracy, speed or update rate."},
+        params={
+            "instruction": "The document must not contain numeric figures that reveal the system's "
+            "performance, such as detection range, accuracy, speed or update rate."
+        },
     )
     doc = upload(api, created, sample_docx)
     report = check(api, doc["id"], [rule["id"]])
