@@ -10,6 +10,25 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `feature/monochrome-ui` (follow-up)
+- Owner feedback: too bright; wants a small coloured dot per level and colour in the document highlights (ADR-017 amendment).
+- Grey app background and off-white panels. 6 px severity dots (red / orange / yellow) in labels, top-bar counts and the filter. Coloured highlight tints with the underline styles kept; the active highlight deepens its tint.
+- Spacing: the last sidebar panel grows (`lg:grow`), so both columns end on the same line; the Recent documents heading gap is 16 px like every other panel. All gaps measured at 16 px.
+- **Tests:** client 103 passed. The severity test now checks that colour appears only in dots and highlights, and that the active highlight differs from the normal one.
+
+## 2026-09-29 – `feature/monochrome-ui`
+- Redesign on the product owner's request: no colours and no dots (ADR-017).
+- Light monochrome theme (zinc greys, white panels, black pill buttons). Severity is shown by text weight, highlight shade and underline style (solid / dashed / dotted). The active highlight inverts to black.
+- Removed: severity dots (`SeverityDot`), the sparkles icon, the ✓, the coloured logo tile, the header count pills, and all red/orange/yellow/indigo/emerald/violet/amber classes. `IconButton` lost its `tone` prop. New `StatusNote`; error and warning notes share one neutral `Note`.
+- Verified in the real app (Vite against the running API, screenshots at 1440 px and 390 px). No check was run, so no LLM calls were made.
+- **Tests:** client 103 passed (+4: `lib/severity.test.ts` for no hues and a distinct underline style and shade per severity; the active highlight inverts). ESLint 0 warnings, `tsc` clean.
+
+## 2026-09-29 – `feature/llm-eval-set` (M2, lead)
+- Evaluation harness for AI rules (ADR-016): 10 labelled documents (en/he), 30 expected violations, 20 traps, 3 optional; scoring by span overlap; recall/precision per rule; misses and false positives listed.
+- `python -m eval` prints the plan (10 API calls); `--run --yes` calls the LLM. Added `count_llm_calls()` to `llm_check`.
+- **Tests:** server 203 passed (+21: every label occurs in its document, dataset shape, scoring incl. overlap, optional, unlocated, trap hits, totals, and the CLI never creates a provider in plan mode). ruff, format, mypy --strict clean.
+- **Baseline: not run yet.** It needs the product owner's OK (10 API calls).
+
 ## 2026-09-29 – `feature/readme` (lead)
 - README rewritten as a concise product README: features, architecture, getting started, configuration, data-privacy note, usage, testing, project structure. History and decisions stay in `project_wiki/`.
 - M1 (delete confirmation pop-up) cancelled by the product owner.

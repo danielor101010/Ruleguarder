@@ -27,8 +27,9 @@ export default function DocumentsPanel({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Last panel in the sidebar: lg:grow stretches it so both columns end on the same line (it never shrinks it)
   return (
-    <Panel className="flex flex-col gap-4 p-4" aria-labelledby="documents-heading">
+    <Panel className="flex flex-col gap-4 p-4 lg:grow" aria-labelledby="documents-heading">
       <PanelHeader id="documents-heading" title="Documents" count={documents.length}>
         <Button size="sm" icon="upload" onClick={() => inputRef.current?.click()} disabled={uploading}>
           {uploading ? "Uploading…" : "Upload .docx"}
@@ -48,9 +49,9 @@ export default function DocumentsPanel({
         />
       </PanelHeader>
       {error && <ErrorNote>{error}</ErrorNote>}
-      {loading && <p className="text-sm text-slate-400">Loading documents…</p>}
+      {loading && <p className="text-sm text-zinc-500">Loading documents…</p>}
       {!loading && !documents.length && (
-        <p className="rounded-xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
+        <p className="rounded-2xl border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500">
           No documents uploaded yet.
         </p>
       )}
@@ -61,24 +62,22 @@ export default function DocumentsPanel({
             <li
               key={doc.id}
               className={cx(
-                "flex items-center gap-2 rounded-xl border pr-2 transition-colors",
-                selected
-                  ? "border-indigo-400/60 bg-indigo-500/15"
-                  : "border-slate-700 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800",
+                "flex items-center gap-2 rounded-2xl border pr-2 transition-colors",
+                selected ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 bg-white hover:border-zinc-400",
               )}
             >
               <button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2.5 pl-3 text-left"
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-2.5 pl-3 text-left"
                 aria-current={selected ? "true" : undefined}
                 onClick={() => onSelect(doc.id)}
               >
-                <Icon name="document" className={cx("size-5 shrink-0", selected ? "text-indigo-300" : "text-slate-500")} />
+                <Icon name="document" className={cx("size-5 shrink-0", selected ? "text-zinc-900" : "text-zinc-400")} />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-white" dir="auto" title={doc.filename}>
+                  <span className="block truncate text-sm font-semibold text-zinc-900" dir="auto" title={doc.filename}>
                     {doc.filename}
                   </span>
-                  <span className="block text-xs text-slate-400">
+                  <span className="block text-xs text-zinc-500">
                     {formatSize(doc.size_bytes)} · {new Date(doc.uploaded_at).toLocaleString()}
                   </span>
                 </span>

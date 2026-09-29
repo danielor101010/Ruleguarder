@@ -16,7 +16,8 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 | `feature/dashboard-ui` | `refactor/severity-levels` | ✅ done (subagent 2) |
 | `feature/templates-dashboard-integration` | both of the above | ✅ merged + verified |
 | `fix/dashboard-ux` | `feature/templates-dashboard-integration` | ✅ UI redesign from your feedback |
-| `fix/check-robustness` | `fix/dashboard-ux` | ✅ bug fixes from the code review, verified (current branch) |
+| `fix/check-robustness` | `fix/dashboard-ux` | ✅ bug fixes from the code review, verified |
+| `feature/monochrome-ui` | `feature/llm-eval-set` (48c3853) | ✅ monochrome redesign, no colours or dots (ADR-017) |
 
 ## ✅ Phase 1 – Scaffold (`feature/project-scaffold`)
 - [x] Stack: FastAPI + python-docx + PostgreSQL + React/Vite/TS + Docker (nginx)
@@ -97,6 +98,13 @@ _6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --stri
 - [ ] Refactor: move check orchestration out of the router into a service layer (do it at the start of M3)
 - [ ] Client cancel/timeout for a running check (fits M3's progress bar)
 
+## ✅ Monochrome redesign (`feature/monochrome-ui`, ADR-017)
+- [x] No colours: zinc greys only, light theme, white panels, black pill buttons
+- [x] No dots, sparkles, ✓ or count pills; severity = text weight + highlight shade + underline style
+- [x] Active highlight inverts to black; errors = black-bordered note (no red)
+- [x] Tests: client 103 ✅ (ESLint 0 warnings, tsc clean); checked in the real app at desktop and phone width
+- [x] Follow-up: dimmer background, small coloured severity dots, coloured document highlights
+
 ## Decisions for you (open)
 - [x] `claude.md` §4: left as is (your call); ADR-014 records the dark design
 - [x] Real AI rules: checked by you on `gemini-3.5-flash`, working
@@ -112,12 +120,12 @@ Order set by you. Each mission gets its own branch, tests, and wiki update per `
 
 ## ~~M1 – Delete confirmation pop-up~~: cancelled by you (the inline Delete → Confirm / Keep stays)
 
-## M2 – Accuracy test set for the AI rules — `feature/llm-eval-set`
+## M2 – Accuracy test set for the AI rules — `feature/llm-eval-set` — 🟡 built; baseline waits for your OK
 Measure how many real violations the AI catches (recall) and how many it invents (false positives), then tune the prompt.
-- [ ] 8–12 sample .docx files (English + Hebrew) with **known, labelled** violations: performance figures, architecture/data-flow details, plus traps that must NOT be flagged (e.g. "approximately fast", years, page numbers)
-- [ ] Labels file: rule → expected quotes per document
-- [ ] Eval script: runs the AI rules and matches found quotes to labels → recall, precision, per-rule table, list of misses
-- [ ] Opt-in only, never in the default test run; prints the number of API calls **before** running and asks for confirmation
+- [x] 10 sample .docx files (English + Hebrew) with **known, labelled** violations: performance figures, architecture/data-flow details, plus traps that must NOT be flagged (e.g. "approximately fast", years, page numbers)
+- [x] Labels: expected / optional / trap quotes per document (`server/eval/dataset.py`)
+- [x] Eval script: runs the AI rules and matches found quotes to labels → recall, precision, per-rule table, list of misses
+- [x] Opt-in only, never in the default test run; prints the number of API calls **before** running and asks for confirmation
 - [ ] Baseline report saved in the wiki; then prompt/effort tuning, with each change compared against the baseline
 - **Done when:** a baseline recall/precision is recorded and each prompt change has before/after numbers. ⚠️ Spends quota: run count agreed with you first
 

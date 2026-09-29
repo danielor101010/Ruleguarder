@@ -90,6 +90,12 @@ def check_llm_rules(provider: LlmProvider, rules: list[LlmRule], blocks: list[Bl
     return findings
 
 
+def count_llm_calls(blocks: list[Block]) -> int:
+    """How many LLM requests one check of this document makes (one per chunk; retries not included)."""
+    llm_blocks = [LlmBlock(b.id, b.label, b.text) for b in blocks if b.text.strip()]
+    return len(_chunk(llm_blocks, get_settings().llm_chunk_chars))
+
+
 def _chunk(blocks: list[LlmBlock], max_chars: int) -> list[list[LlmBlock]]:
     chunks: list[list[LlmBlock]] = []
     current: list[LlmBlock] = []

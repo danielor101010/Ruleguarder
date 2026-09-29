@@ -3,34 +3,33 @@ import type { Severity } from "../types";
 export const SEVERITY_LABEL: Record<Severity, string> = { high: "High", medium: "Medium", low: "Low" };
 
 /**
- * Tailwind classes per severity: High red, Medium orange, Low yellow (ADR-010).
- * `mark` / `block` sit on the white document page; the rest sit on the dark dashboard.
+ * Tailwind classes per severity (ADR-017). The dashboard chrome is monochrome; colour appears only in
+ * the small `dot` next to a label and in the document highlights (High red, Medium orange, Low yellow).
+ * Highlights also differ by underline style (solid / dashed / dotted), so they read without colour.
+ * `mark` / `active` / `block` sit on the white document page; `text` is the plain grey label.
  * Full class strings on purpose, so Tailwind's scanner finds them.
  */
-export const SEVERITY_CLASSES: Record<
-  Severity,
-  { mark: string; block: string; dot: string; text: string; segment: string }
-> = {
+export const SEVERITY_CLASSES: Record<Severity, { mark: string; active: string; block: string; text: string; dot: string }> = {
   high: {
-    mark: "bg-red-200/90 decoration-red-600",
-    block: "bg-red-50 shadow-[inset_3px_0_0_0_var(--color-red-500)]",
-    dot: "bg-sev-high",
-    text: "text-red-300",
-    segment: "aria-pressed:bg-red-500/20 aria-pressed:text-red-100",
+    mark: "bg-red-100 decoration-red-500 decoration-solid",
+    active: "bg-red-200 decoration-red-600 decoration-solid",
+    block: "bg-red-50",
+    text: "font-bold text-zinc-900",
+    dot: "bg-red-500",
   },
   medium: {
-    mark: "bg-orange-200/90 decoration-orange-600",
-    block: "bg-orange-50 shadow-[inset_3px_0_0_0_var(--color-orange-500)]",
-    dot: "bg-sev-medium",
-    text: "text-orange-300",
-    segment: "aria-pressed:bg-orange-500/20 aria-pressed:text-orange-100",
+    mark: "bg-orange-100 decoration-orange-400 decoration-dashed",
+    active: "bg-orange-200 decoration-orange-600 decoration-dashed",
+    block: "bg-orange-50",
+    text: "font-semibold text-zinc-700",
+    dot: "bg-orange-400",
   },
   low: {
-    mark: "bg-yellow-200 decoration-yellow-600",
-    block: "bg-yellow-50 shadow-[inset_3px_0_0_0_var(--color-yellow-500)]",
-    dot: "bg-yellow-500",
-    text: "text-yellow-300",
-    segment: "aria-pressed:bg-yellow-400/20 aria-pressed:text-yellow-100",
+    mark: "bg-yellow-100 decoration-yellow-500 decoration-dotted",
+    active: "bg-yellow-200 decoration-yellow-600 decoration-dotted",
+    block: "bg-yellow-50",
+    text: "font-medium text-zinc-500",
+    dot: "bg-yellow-400",
   },
 };
 

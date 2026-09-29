@@ -2,41 +2,36 @@
 
 /*
  * Design tokens (Tailwind v4 CSS-first config). Utilities are generated from these, e.g.
- * `bg-accent`, `text-sev-high`, `animate-flash`. Severity colours follow ADR-010.
+ * `animate-flash`. The UI is monochrome (ADR-017): zinc greys, white surfaces, black accents.
  */
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-
-
-  --color-sev-high: #dc2626;
-  --color-sev-medium: #ea580c;
-  --color-sev-low: #a16207;
 
   --animate-flash: flash 1.5s ease-out;
 
   @keyframes flash {
     0%,
     30% {
-      background-color: rgb(129 140 248 / 0.28);
+      background-color: rgb(24 24 27 / 0.14);
     }
     100% {
-      background-color: rgb(129 140 248 / 0);
+      background-color: rgb(24 24 27 / 0);
     }
   }
 }
 
 @layer base {
   html {
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   body {
-    @apply bg-slate-950 font-sans text-slate-100 antialiased;
+    @apply bg-zinc-200 font-sans text-zinc-900 antialiased;
   }
 
-  /* Visible keyboard focus only (never on mouse click), readable on dark and on the white page */
+  /* Visible keyboard focus only (never on mouse click) */
   :focus-visible {
-    outline: 2px solid var(--color-indigo-400);
+    outline: 2px solid var(--color-zinc-900);
     outline-offset: 2px;
   }
 

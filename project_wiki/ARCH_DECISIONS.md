@@ -66,7 +66,7 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 
 **Consequences.** jsdom is pinned to 25 because jsdom 26+ needs Node ≥ 24.15 (local Node is 24.11). One npm deprecation warning remains from a transitive jsdom dependency (`whatwg-encoding`), which is not our code.
 
-## ADR-010 – Severity levels high / medium / low (Accepted, 2026-09-29)
+## ADR-010 – Severity levels high / medium / low (Accepted, 2026-09-29; colours superseded by ADR-017)
 **Context.** The product owner wants High = red, Medium = orange, Low = yellow. The API used error / warning / info.
 **Decision.** `Severity = Literal["low", "medium", "high"]` with a Pydantic `BeforeValidator` that maps the legacy names (error→high, warning→medium, info→low). Stored reports are therefore upgraded on read, and `ReportSummary.by_severity` keys are merged. Stored rules are rewritten once at startup by `app/migrations.py::upgrade_legacy_severities` (idempotent). The default severity is `high`.
 **Consequences.** Old clients sending legacy names keep working. Colours: high `#dc2626`, medium `#ea580c`, low `#a16207` (yellow-700, chosen for text contrast on light backgrounds).
@@ -111,7 +111,7 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 
 **Consequences.** Integration found issues neither agent could see alone: a Playwright locator built from an unescaped label, and the PII masking overstatement. Both agents' worktrees started at the initial commit instead of the intended base; both noticed and branched from the right commit, so the lead should check the base on every hand-back.
 
-## ADR-014 – Opaque dark dashboard, dialogs for rules, no chips (Accepted, 2026-09-29; supersedes the surface part of ADR-012)
+## ADR-014 – Opaque dark dashboard, dialogs for rules, no chips (Accepted, 2026-09-29; supersedes the surface part of ADR-012; colours and surfaces superseded by ADR-017)
 **Context.** Product-owner review of the ADR-012 UI:
 - translucent white panels (`bg-white/70`) over navy rendered as muddy grey with weak contrast;
 - the layout left the main area mostly empty;
@@ -177,3 +177,42 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - The engine takes the ORM `Rule`.
 - `check_llm_rules` reads settings itself.
 - No client-side cancel or timeout for a running check (nginx ends it at 600 s → 504).
+
+## ADR-016 – Offline evaluation set for AI rules (Accepted, 2026-09-29)
+**Context.** Whether the AI rules find every violation was only spot-checked. Prompt, model or effort changes need a number to compare against.
+**Decision.**
+- `server/eval/`: 10 labelled documents (English + Hebrew, one with a table, one with no violations) and two AI rules: performance figures and internal architecture details.
+- The documents are built as real .docx files at run time and parsed by the production parser; the AI check runs through the production `check_llm_rules`.
+- Labels are verbatim quotes:
+  - **expected**: 30; they count for recall and precision;
+  - **traps**: 20; must not be flagged (years, versions, section/page/figure numbers, counts, prices, vague "performs well");
+  - **optional**: 3 borderline cases; they count neither way.
+- Matching: same block, overlapping character span. An unlocated finding (quote not found) matches its whole block and is reported separately.
+- Metrics per rule and total: **recall** (share of expected violations found), **precision** (share of judged findings that are correct), plus a list of misses and false positives. Traps are marked.
+- **Quota safety:**
+  - `python -m eval` only prints the plan and the exact call count (10 calls; 20 worst case with retries);
+  - it calls the LLM only with `--run` plus confirmation (`--yes` when not interactive);
+  - it is never part of `pytest`: the harness tests use a fake provider.
+- Results are written to `server/eval/results/` (git-ignored); baselines are copied into this wiki.
+
+**Consequences.** Every prompt or model change is judged against the recorded baseline. Adding a case means adding a document and its labels; a label that doesn't occur in its document fails the tests.
+
+## ADR-017 – Monochrome UI: no colours, no dots (Accepted, 2026-09-29; supersedes the colours of ADR-010 and the surfaces/colours of ADR-014)
+**Context.** Product-owner feedback on the ADR-014 dark dashboard: remove the colourful colours and the signs (coloured dots, sparkles, ✓) and redesign.
+
+**Decision.**
+- **Palette:** Tailwind `zinc` greys only. Light theme: `zinc-100` app background, white `rounded-3xl` panels with a hairline `zinc-200` border, `zinc-900` text. No hue classes anywhere in `client/src` (a unit test guards `SEVERITY_CLASSES`).
+- **Buttons:** primary = black `rounded-full` pill (`zinc-900`), secondary = white pill with a `zinc-300` border, ghost/icon buttons round. Delete keeps the two-step confirm; the confirm button is black, not red. Switches are black when on and grey when off.
+- **Severity without colour:** plain uppercase text labels (High bold black, Medium semibold dark grey, Low medium grey). No dots. In the document, highlights differ by **shade** (high `zinc-300`, medium `zinc-200`, low `zinc-100`) **and underline style** (solid / dashed / dotted), so they can be told apart without colour and in greyscale print.
+- **Selection:** the active highlight inverts to black with white text; the selected card and document use a black border; the flash is a grey fade.
+- **Signs removed:** severity dots, the sparkles icon ("Uses AI quota" is plain grey text), the ✓ in "No violations found.", the coloured logo tile, and the count pills in panel headers (plain grey numbers now).
+- **Notes:** errors are a light panel with a black border and an alert icon (`role="alert"`); warnings have a grey border; status notes are a grey fill. There is no red.
+- The severity filter is a segmented control: the selected segment is white and raised on a grey track.
+
+**Consequences.** Closer to `project_wiki/claude.md` §4 again (white panels, generous radii, dark pill buttons) but opaque: no translucent glass, which the owner rejected in ADR-014. Errors and high severity are no longer signalled by red; they rely on weight, borders, icons and wording. If the owner wants one accent colour back (e.g. red for errors only), it goes in `ui.tsx` (`Note`) and `lib/severity.ts`.
+
+**Amendment (same day, owner feedback: "too bright"; "add a really small coloured dot next to the level"; "here you can also put colour" on the document highlights):**
+- Dimmer chrome: app background `zinc-200`, panels and top bar `zinc-50` with a `zinc-300/70` border. Cards, dialogs and the document page stay white.
+- A 6 px coloured dot (`SeverityDot`) sits before every severity label: High `red-500`, Medium `orange-400`, Low `yellow-400`. The labels themselves stay grey.
+- Document highlights are coloured tints again (`red/orange/yellow-100`) and keep the solid / dashed / dotted underline. The active highlight is a deeper tint (`-200`) with a thicker underline, not black. Whole-block flags use `-50` tints.
+- Everything else (buttons, switches, notes, selection borders) stays monochrome.
