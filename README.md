@@ -63,6 +63,16 @@ docker compose up --build     # app: http://localhost:8080   API docs: http://lo
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build   # app: http://localhost:5173
 ```
 
+## Tests
+
+```bash
+docker compose --profile test run --rm tests     # unit + E2E against the running stack
+```
+
+- Unit tests: parser, rule types, LLM pipeline (fake provider), Gemini provider (mocked SDK)
+- E2E: upload a generated sample .docx, create rules, run a check, verify the exact highlighted text
+- The real-Gemini E2E test runs only when `GEMINI_API_KEY` in `.env` is a real key
+
 ## API
 
 | Method | Path | |

@@ -54,13 +54,15 @@ def parse_docx(source: str | IO[bytes]) -> list[Block]:
             continue
 
         table_no += 1
-        seen_cells: set[int] = set()
+        # Holds the <w:tc> elements themselves: that keeps lxml's proxies alive, so the
+        # same cell always maps to the same object (id() of a freed proxy gets reused).
+        seen_cells: set[Any] = set()
         for r, row in enumerate(item.rows, start=1):
             for c, cell in enumerate(row.cells, start=1):
                 # Merged cells are returned once per grid position; only emit them once.
-                if id(cell._tc) in seen_cells:
+                if cell._tc in seen_cells:
                     continue
-                seen_cells.add(id(cell._tc))
+                seen_cells.add(cell._tc)
                 for p in cell.paragraphs:
                     block = _paragraph_to_block(
                         p,

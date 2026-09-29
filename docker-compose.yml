@@ -10,8 +10,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -19,7 +17,9 @@ services:
       retries: 10
 
   server:
-    build: ./server
+    build:
+      context: ./server
+      target: prod
     restart: unless-stopped
     env_file: .env
     environment:
@@ -40,6 +40,19 @@ services:
     restart: unless-stopped
     ports:
       - "${CLIENT_PORT:-8080}:80"
+    depends_on:
+      server:
+        condition: service_healthy
+
+  # Unit + E2E tests:  docker compose --profile test run --rm tests
+  tests:
+    profiles: ["test"]
+    build:
+      context: ./server
+      target: test
+    env_file: .env
+    environment:
+      API_URL: http://server:8000
     depends_on:
       server:
         condition: service_healthy

@@ -1,56 +1,60 @@
 # Ruleguarder – work tracker
 
-Legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blocked / needs you
+Legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` needs you
 
-## Phase 1 – Scaffold ✅ (code complete, waiting on a real run)
+Branching: one feature branch per task, never commit directly to `dev` / `main`.
 
-### Plan & tech stack
-- [x] Choose stack: FastAPI + python-docx + PostgreSQL + React/Vite/TS + Docker
-- [x] Pivot: rules are checked by an LLM (Claude), with deterministic checks kept for formatting
-- [x] Architecture + tech stack in README
+| Branch | Based on | Status |
+|---|---|---|
+| `feature/project-scaffold` | `dev` | ✅ committed |
+| `feature/gemini-integration` | `feature/project-scaffold` | ✅ committed |
+| `feature/e2e-tests` | `feature/gemini-integration` | ✅ committed |
+| `feature/dashboard-ui` | `feature/e2e-tests` | next |
+| `feature/rule-templates` | – | planned |
 
-### Server (`server/`)
-- [x] Settings from env (`app/config.py`)
-- [x] DB setup + models: `Rule`, `Document`, `CheckRun` (`app/db.py`, `app/models.py`)
-- [x] API schemas (`app/schemas.py`)
-- [x] DOCX parser: paragraphs, headings, tables, fonts, sizes, positions (`app/docx_parser.py`)
-- [x] Deterministic rule types: forbidden/required text, sentence/paragraph length, fonts, font size
-- [x] LLM provider interface + Claude implementation (`app/llm/`)
-- [x] LLM checker: chunking, parallel calls, quote → exact offsets (Hebrew-aware)
-- [x] "AI rule (plain language)" rule type
-- [x] Rule engine combining LLM + deterministic checks
-- [x] API routes: rules CRUD, rule types, documents upload/list/get/delete, check, latest report
-- [x] `main.py` (CORS, health, table creation)
-- [x] Python syntax check passes
-- [x] Quote locator tested on the Hebrew example (״ vs ", extra whitespace, missing quote)
+## ✅ Phase 1 – Scaffold (`feature/project-scaffold`)
+- [x] Stack: FastAPI + python-docx + PostgreSQL + React/Vite/TS + Docker (nginx)
+- [x] DOCX parser: paragraphs, headings, tables, fonts, sizes, positions
+- [x] Rule engine: LLM rules + deterministic rules (forbidden/required text, length, fonts, sizes)
+- [x] LLM checker: chunking, parallel calls, quote → exact offsets
+- [x] API: rules CRUD, rule types, documents, check, stored reports
+- [x] Client: rules panel (schema-driven form), upload, document view with highlights, violations list
+- [x] docker-compose (prod + dev override), `.env.example`
 
-### Client (`client/`)
-- [x] Vite + React + TS setup, API client, types
-- [x] Rules panel: create/edit/toggle/delete, form generated from rule-type schema
-- [x] Documents panel: upload .docx, list, delete
-- [x] Report view: highlighted violations (RTL via `dir="auto"`), violations list, click to jump
-- [x] `tsc` + `vite build` pass
-- [x] nginx prod image, `/api` proxied to server
+## ✅ Phase 2a – Gemini (`feature/gemini-integration`)
+- [x] Replace Anthropic SDK with `google-genai`
+- [x] Native structured output: `response_mime_type="application/json"` + Pydantic `response_schema`
+- [x] Retry with backoff on 429 / 5xx (free-tier quotas), clear errors for blocked / truncated answers
+- [x] `GEMINI_API_KEY` + `LLM_*` settings in `.env.example`
+- [x] Default model `gemini-3.8-flash` (1.5 models are no longer available); `gemini-3.1-pro-preview` for deeper review
 
-### Infra
-- [x] `docker-compose.yml` (db, server, client) – config validated
-- [x] `docker-compose.dev.yml` (hot reload) – config validated
-- [x] `.env.example`, `.gitignore`
-- [!] `docker compose up --build` – **not run yet: Docker Desktop was not running**
-- [!] End-to-end test with a real Hebrew .docx + real API key
+## ✅ Phase 2b – Tests (`feature/e2e-tests`)
+- [x] `tests` service in docker-compose (`docker compose --profile test run --rm tests`)
+- [x] Unit tests: parser, rules, LLM pipeline (fake provider), Gemini provider (mocked SDK)
+- [x] E2E: full flow through the running API with a generated sample .docx
+- [x] Fixed bug found by tests: table cells were dropped (merged-cell dedup used reused `id()`s)
+- [x] DB port no longer published in prod (clashed with a local Postgres); dev uses 5433
+- [x] Full stack verified: http://localhost:8080 → nginx → API → Postgres
+- [!] Real Gemini E2E: put a real `GEMINI_API_KEY` in `.env`, then rerun the tests
 
-## Phase 2 – Verify & harden (next)
-- [ ] Start Docker Desktop, build, run end-to-end with a sample Hebrew document
-- [ ] Unit tests: parser (sample .docx fixtures), deterministic rules, quote locator
-- [ ] Evaluation set: sample documents with known violations → measure how many the LLM catches (recall)
-- [ ] Tune the LLM prompt/effort from the eval results
-- [ ] Decide on data sensitivity: cloud LLM vs self-hosted model (provider interface is ready)
+## Phase 3 – Dashboard UI (`feature/dashboard-ui`)
+- [ ] Enterprise security dashboard look: slate / dark navy theme, LTR, English-first
+- [ ] Severity levels High / Medium / Low (red / orange / yellow) – rename from error / warning / info (API + DB + UI)
+- [ ] Split screen: document (left) · violations (right); click → smooth scroll + flash highlight
+- [ ] "Load Sample Rules" button
+- [ ] Filter violations by severity / rule, counts per severity
 
-## Phase 3 – Product features
-- [ ] Run checks as background jobs with progress (long documents)
-- [ ] Rule sets (group rules, choose a set per check)
+## Phase 4 – Rule templates (`feature/rule-templates`)
+- [ ] PII & data leakage (regex): SSN, phone numbers, email addresses, credit cards (with Luhn check to cut false positives)
+- [ ] Acronyms & definitions: first occurrence of an acronym without "(…)" definition
+- [ ] Broken cross-references: "Section 3.2", "Figure 4", "Table 2" must exist in the document
+- [ ] Template picker in the UI (one click adds a pre-filled rule)
+
+## Later
+- [ ] Decide on data sensitivity: free-tier Gemini may use submitted content (see `.env.example`)
+- [ ] Evaluation set: documents with known violations → measure LLM recall, tune prompt
+- [ ] Background jobs with progress for long documents
 - [ ] Headers, footers, footnotes, text boxes, nested tables in the parser
-- [ ] Export report (DOCX with Word comments at each violation / PDF)
-- [ ] Mark a violation as "false positive / accepted"
-- [ ] Hebrew UI (i18n + full RTL layout)
+- [ ] Export report (DOCX with Word comments / PDF)
+- [ ] Mark a violation as false positive / accepted
 - [ ] Auth / users, Alembic migrations

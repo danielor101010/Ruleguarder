@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -10,6 +10,15 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
+
+# Test image: unit tests + E2E tests against the running stack
+FROM base AS test
+COPY requirements-dev.txt pytest.ini ./
+RUN pip install -r requirements-dev.txt
+COPY tests ./tests
+CMD ["pytest", "-v"]
+
+FROM base AS prod
 
 RUN useradd --create-home app \
     && mkdir -p /data/uploads \
