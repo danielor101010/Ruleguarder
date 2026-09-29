@@ -10,6 +10,11 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `feature/readme` (lead)
+- README rewritten as a concise product README: features, architecture, getting started, configuration, data-privacy note, usage, testing, project structure. History and decisions stay in `project_wiki/`.
+- M1 (delete confirmation pop-up) cancelled by the product owner.
+- Branches pushed to `origin`; `dev` merged into `main`.
+
 ## 2026-09-29 – `fix/check-robustness`
 Fixes from a code review of business logic, separation and fallbacks. See ADR-015.
 - **Partial reports:** an AI outage, invalid stored params, a checker bug or a slow regex fail only that rule (`summary.failed_rules`). The check returns 502 only when no rule could run.

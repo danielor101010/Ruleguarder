@@ -110,12 +110,7 @@ _6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --stri
 # Missions (written 2026-09-29, not started)
 Order set by you. Each mission gets its own branch, tests, and wiki update per `project_wiki/claude.md`.
 
-## M1 – "Are you sure?" pop-up before deleting — `feature/delete-confirm-dialog`
-Today delete is a two-step inline button (Delete → Delete / Keep). Replace it with a confirmation pop-up.
-- [ ] `ConfirmDialog` built on the existing accessible `Modal`: title "Delete <name>?", the consequence spelled out (e.g. "This also deletes its stored reports" for documents), buttons **Cancel** (default focus) and **Delete** (red)
-- [ ] Used for deleting rules (from the rule pop-up) and documents (from the list)
-- [ ] Escape / backdrop / Cancel close without deleting; focus returns to the Delete button
-- **Done when:** Vitest covers confirm, cancel, Escape and focus return; Playwright deletes a rule and a document through the pop-up; no delete happens without confirming
+## ~~M1 – Delete confirmation pop-up~~: cancelled by you (the inline Delete → Confirm / Keep stays)
 
 ## M2 – Accuracy test set for the AI rules — `feature/llm-eval-set`
 Measure how many real violations the AI catches (recall) and how many it invents (false positives), then tune the prompt.
