@@ -10,6 +10,13 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `feature/monochrome-ui`
+- Redesign on the product owner's request: no colours and no dots (ADR-017).
+- Light monochrome theme (zinc greys, white panels, black pill buttons). Severity is shown by text weight, highlight shade and underline style (solid / dashed / dotted). The active highlight inverts to black.
+- Removed: severity dots (`SeverityDot`), the sparkles icon, the ✓, the coloured logo tile, the header count pills, and all red/orange/yellow/indigo/emerald/violet/amber classes. `IconButton` lost its `tone` prop. New `StatusNote`; error and warning notes share one neutral `Note`.
+- Verified in the real app (Vite against the running API, screenshots at 1440 px and 390 px). No check was run, so no LLM calls were made.
+- **Tests:** client 103 passed (+4: `lib/severity.test.ts` for no hues and a distinct underline style and shade per severity; the active highlight inverts). ESLint 0 warnings, `tsc` clean.
+
 ## 2026-09-29 – `feature/llm-eval-set` (M2, lead)
 - Evaluation harness for AI rules (ADR-016): 10 labelled documents (en/he), 30 expected violations, 20 traps, 3 optional; scoring by span overlap; recall/precision per rule; misses and false positives listed.
 - `python -m eval` prints the plan (10 API calls); `--run --yes` calls the LLM. Added `count_llm_calls()` to `llm_check`.

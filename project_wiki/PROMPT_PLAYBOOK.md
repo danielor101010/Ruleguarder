@@ -49,6 +49,11 @@ Example given (Hebrew): the user uploads a document describing an operational sy
 ### P9 – Visibility
 > "Show me in chat the todo / I don't see any progress in the todo." → TODO.md is refreshed by the lead on every status check (agents don't edit it).
 
+### P10 – Monochrome redesign
+> "Read project wiki folder and listen to the rules! I want you to remove the colors and the signs like colorful colors and dots from the design and redesign it again."
+
+→ ADR-017: a light monochrome UI with no hues, no dots and no decorative icons. Severity is carried by text, shade and underline style.
+
 ---
 
 ## System prompts used by the app
