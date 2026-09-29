@@ -12,6 +12,9 @@ export interface Run {
   italic: boolean | null;
 }
 
+/** Where a block is in the document; "textbox" blocks follow the paragraph that holds them. */
+export type BlockPart = "body" | "header" | "footer" | "footnote" | "endnote" | "textbox";
+
 export interface Block {
   id: number;
   kind: "paragraph" | "heading" | "table_cell";
@@ -25,6 +28,8 @@ export interface Block {
   row: number | null;
   col: number | null;
   runs: Run[];
+  /** Missing on documents parsed before parts existed: treat as "body". */
+  part?: BlockPart;
 }
 
 export interface DocumentSummary {
@@ -136,3 +141,23 @@ export interface Report {
     failed_rules?: FailedRule[];
   };
 }
+
+export type CheckState = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+/** A background check (see API_CONTRACTS: background checks). */
+export interface CheckStatus {
+  check_id: number;
+  document_id: number;
+  status: CheckState;
+  /** Steps finished: built-in rules count as one, each AI request as one. */
+  progress_done: number;
+  /** 0 until the server knows how many steps there are. */
+  progress_total: number;
+  /** e.g. "AI rules: part 3 of 7" */
+  step: string | null;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export const ACTIVE_CHECK_STATES: readonly CheckState[] = ["queued", "running"];

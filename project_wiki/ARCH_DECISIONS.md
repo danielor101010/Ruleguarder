@@ -216,3 +216,30 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - A 6 px coloured dot (`SeverityDot`) sits before every severity label: High `red-500`, Medium `orange-400`, Low `yellow-400`. The labels themselves stay grey.
 - Document highlights are coloured tints again (`red/orange/yellow-100`) and keep the solid / dashed / dotted underline. The active highlight is a deeper tint (`-200`) with a thicker underline, not black. Whole-block flags use `-50` tints.
 - Everything else (buttons, switches, notes, selection borders) stays monochrome.
+## ADR-018 – Background checks with progress and cancel (Accepted, 2026-09-29)
+(ADR-017 is used by the monochrome UI work on `feature/monochrome-ui`.)
+**Context.** A check was one blocking HTTP request; long documents with AI rules kept the page waiting with no feedback, and a reload lost the result.
+**Decision.**
+- `CheckRunner` (`app/checks.py`), one per process: a small thread pool (`CHECK_WORKERS`, default 2) runs `run_rules` in the background. All state is in `check_runs`: `status` (queued → running → completed / failed / cancelled), `progress_done` / `progress_total`, `step`, `finished_at`. Clients poll `GET /api/checks/{id}` (every 1 s in the UI), and a reloaded page reconnects via `GET /api/documents/{id}/checks/latest`.
+- Progress: one step for all built-in rules and one per AI request; `Progress` protocol (`rules/progress.py`) with `begin/advance/cancelled`.
+- Cancel: the row is marked `cancelled` at once and an in-memory flag is set. The engine checks the flag between steps and raises `CheckCancelled`; an AI request already in flight finishes, but its result is discarded.
+- AI requests are now submitted **lazily**, at most `LLM_MAX_PARALLEL` in flight. With a pre-filled pool, the worker started the next queued request before a cancel (or a failure) could stop it. A test caught this: 3 requests instead of 1.
+- One active check per document (a lock around find-or-create). A second start returns the running check.
+- Startup: `add_missing_columns` (`create_all` doesn't alter existing tables) and `fail_interrupted_checks` (checks left queued/running by a restart become `failed`).
+- The synchronous `POST /documents/{id}/check` stays for tests and scripts. Both paths share `finish_run` (with no rule checked → `failed`, else `completed`).
+
+**Consequences.** Single-process design: the cancel flag and worker pool live in memory, so several server replicas would need a shared queue (e.g. a DB-polled job table or Redis). Progress costs one small UPDATE per step.
+
+## ADR-019 – Parser coverage: every text-bearing part of a .docx (Accepted, 2026-09-29)
+**Context.** Only body paragraphs and top-level tables were read, so violations in headers, footers, footnotes, text boxes, nested tables, hyperlinks or field results were never found.
+**Decision.**
+- `Block.part`: `body | header | footer | footnote | endnote | textbox` (default `body`, so stored documents still load).
+- Order: body (with text boxes right after the paragraph that holds them), then headers/footers per section, then footnotes, then endnotes. First-occurrence rules (acronyms) therefore see the body first.
+- **Headers/footers:** default, first-page and even-page variants per section. Linked ones are skipped, and parts are de-duplicated by identity. Labels like "First-page header (section 2)".
+- **Footnotes/endnotes:** read from their XML parts (python-docx 1.2 has no API); separator notes are skipped. Labels "Footnote 3", numbered in part order (Word's display order in practice).
+- **Text boxes:** `w:txbxContent`, skipping the VML copy under `mc:Fallback` (Word stores each box twice).
+- **Nested tables:** walked recursively. Their cells keep the outer cell's position (that's where the UI draws them) and get a label naming both levels.
+- **Run text** includes runs inside `w:hyperlink`, `w:fldSimple` (e.g. SEQ caption numbers), content controls, smart tags and insertions. This fixes the ADR-011 limitation on caption numbers.
+- The UI shows Header / Footer / Footnotes / Endnotes as labelled regions of the white page, and text boxes as framed blocks, so click-to-locate works in every part.
+
+**Consequences.** Comments, tracked deletions and chart/SmartArt text are still not read. Footnote numbers assume the part order matches the reference order.

@@ -1,14 +1,4 @@
-import type {
-  DocumentFull,
-  DocumentSummary,
-  Report,
-  Rule,
-  RuleCreate,
-  RuleTemplate,
-  RuleType,
-  RuleUpdate,
-  SampleRulesResult,
-} from "./types";
+import type { CheckStatus, DocumentFull, DocumentSummary, Report, Rule, RuleCreate, RuleTemplate, RuleType, RuleUpdate, SampleRulesResult } from "./types";
 
 const BASE = "/api";
 
@@ -79,4 +69,9 @@ export const api = {
   deleteDocument: (id: number) => requestNoContent(`/documents/${id}`, { method: "DELETE" }),
   check: (id: number) => request<Report>(`/documents/${id}/check`, json("POST", {})),
   latestReport: (id: number) => request<Report>(`/documents/${id}/report`),
+  /** Start a background check (returns the running one if the document already has one). */
+  startCheck: (id: number) => request<CheckStatus>(`/documents/${id}/checks`, json("POST", {})),
+  latestCheck: (id: number) => request<CheckStatus>(`/documents/${id}/checks/latest`),
+  getCheck: (checkId: number) => request<CheckStatus>(`/checks/${checkId}`),
+  cancelCheck: (checkId: number) => request<CheckStatus>(`/checks/${checkId}/cancel`, json("POST", {})),
 };

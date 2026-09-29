@@ -22,6 +22,24 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 - Removed: severity dots (`SeverityDot`), the sparkles icon, the ✓, the coloured logo tile, the header count pills, and all red/orange/yellow/indigo/emerald/violet/amber classes. `IconButton` lost its `tone` prop. New `StatusNote`; error and warning notes share one neutral `Note`.
 - Verified in the real app (Vite against the running API, screenshots at 1440 px and 390 px). No check was run, so no LLM calls were made.
 - **Tests:** client 103 passed (+4: `lib/severity.test.ts` for no hues and a distinct underline style and shade per severity; the active highlight inverts). ESLint 0 warnings, `tsc` clean.
+## 2026-09-29 – `feature/parser-coverage` (M4, lead)
+- The parser reads headers/footers (all variants, linked ones once), footnotes, endnotes, text boxes (once, not the VML copy), nested tables, hyperlink text and field results (ADR-019).
+- The document view shows the page regions (Header, Footer, Footnotes, Endnotes) and framed text boxes.
+- **Tests:**
+  - server 223 passed (+9: a fixture .docx with every part; labels, order, offsets, linked-header dedup, text box once, a rule finding violations in header / footnote / endnote / text box / nested table, SEQ caption counted as a figure, old documents still load)
+  - client 107 passed (+2: region split; highlight and click-to-locate inside a footnote)
+  - Playwright 5 passed / 1 skipped
+- Not added: a Playwright test that uploads a document with headers and footnotes (covered by the server fixture + component test).
+
+## 2026-09-29 – `feature/background-checks` (M3, lead)
+- Background checks with progress and cancel (ADR-018): 4 new endpoints, `CheckRunner`, progress columns and startup migration, restart recovery.
+- **Bug found by tests and fixed:** after a cancel, queued AI requests still started (3 calls instead of 1); requests are now submitted lazily.
+- Client: `useDocumentReport` starts, polls (1 s), cancels and reconnects after a reload; `CheckProgress` bar ("AI rules: part 3 of 7", n / total, Cancel); the newest failed check is explained.
+- **Process note:** several sessions shared one working tree, and another session switched it to its own branch while this work was uncommitted. The work was moved to a dedicated worktree (`../rg-m3`); the other sessions were informed.
+- **Tests:**
+  - server 214 passed (+11: state transitions, progress counts, cancel stops further AI requests, one active check, partial/total failure, deleted rules, restart recovery, column migration; API E2E for the async flow and errors)
+  - client 105 passed (+6)
+  - Playwright 5 passed / 1 skipped (isolated stack)
 
 ## 2026-09-29 – `feature/llm-eval-set` (M2, lead)
 - Evaluation harness for AI rules (ADR-016): 10 labelled documents (en/he), 30 expected violations, 20 traps, 3 optional; scoring by span overlap; recall/precision per rule; misses and false positives listed.

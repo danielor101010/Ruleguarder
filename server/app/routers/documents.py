@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..checks import CheckRunner, finish_run, get_runner
 from ..config import get_settings
 from ..db import get_db
 from ..docx_parser import DocxParseError, parse_docx
@@ -16,6 +17,7 @@ from ..rules import run_rules
 from ..schemas import (
     Block,
     CheckRequest,
+    CheckStatus,
     DocumentOut,
     DocumentSummary,
     ReportOut,
@@ -103,33 +105,40 @@ def check_document(document_id: int, body: CheckRequest | None = None, db: Sessi
     doesn't block the event loop.
     """
     doc = _get_or_404(db, document_id)
-
-    query = select(Rule).order_by(Rule.id)
-    if body and body.rule_ids is not None:
-        query = query.where(Rule.id.in_(body.rule_ids))
-    else:
-        query = query.where(Rule.enabled.is_(True))
-    rules = list(db.scalars(query))
-    if not rules:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No rules to check. Create or enable a rule first.")
+    rules = _rules_for(db, body)
 
     blocks = [Block.model_validate(b) for b in doc.blocks]
     run = CheckRun(document_id=doc.id, rule_ids=[r.id for r in rules])
     violations, summary = run_rules(rules, blocks, get_llm_provider)
-
-    if summary.failed_rules and summary.rules_checked == 0:
-        errors = list(dict.fromkeys(f.error for f in summary.failed_rules))
-        run.status, run.error = "failed", " ".join(errors)
-        db.add(run)
-        db.commit()
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"No rule could be checked. {run.error}")
-
-    run.status = "completed"
-    run.violations = [v.model_dump() for v in violations]
-    run.summary = summary.model_dump()
+    finish_run(run, violations, summary)
     db.add(run)
     db.commit()
+    if run.status == "failed":
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, run.error)
     return _report(doc, run)
+
+
+@router.post("/{document_id}/checks", response_model=CheckStatus, status_code=status.HTTP_202_ACCEPTED)
+def start_check(
+    document_id: int,
+    body: CheckRequest | None = None,
+    db: Session = Depends(get_db),
+    runner: CheckRunner = Depends(get_runner),
+) -> CheckRun:
+    """Start a background check (or return the document's check that is already running)."""
+    doc = _get_or_404(db, document_id)
+    return runner.start(db, doc, _rules_for(db, body))
+
+
+@router.get("/{document_id}/checks/latest", response_model=CheckStatus)
+def latest_check(document_id: int, db: Session = Depends(get_db)) -> CheckRun:
+    doc = _get_or_404(db, document_id)
+    run = db.scalars(
+        select(CheckRun).where(CheckRun.document_id == doc.id).order_by(CheckRun.id.desc()).limit(1)
+    ).first()
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This document has not been checked yet")
+    return run
 
 
 @router.get("/{document_id}/report", response_model=ReportOut)
@@ -154,6 +163,19 @@ def _report(doc: Document, run: CheckRun) -> ReportOut:
         violations=[Violation.model_validate(v) for v in run.violations],
         summary=ReportSummary.model_validate(run.summary),
     )
+
+
+def _rules_for(db: Session, body: CheckRequest | None) -> list[Rule]:
+    """The requested rules, or all enabled ones."""
+    query = select(Rule).order_by(Rule.id)
+    if body and body.rule_ids is not None:
+        query = query.where(Rule.id.in_(body.rule_ids))
+    else:
+        query = query.where(Rule.enabled.is_(True))
+    rules = list(db.scalars(query))
+    if not rules:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No rules to check. Create or enable a rule first.")
+    return rules
 
 
 def _get_or_404(db: Session, document_id: int) -> Document:

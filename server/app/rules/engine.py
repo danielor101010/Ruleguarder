@@ -9,8 +9,9 @@ from ..llm import LlmError, LlmProvider, LlmRule
 from ..models import Rule
 from ..schemas import Block, FailedRule, ReportSummary, Violation
 from .finding import Finding
-from .llm_check import check_llm_rules
-from .registry import REGEX_TIMEOUT_SECONDS, RULE_TYPES
+from .llm_check import check_llm_rules, count_llm_calls
+from .progress import CheckCancelled, NoProgress, Progress
+from .registry import LLM_RULE_TYPE, REGEX_TIMEOUT_SECONDS, RULE_TYPES
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +34,10 @@ def validate_rule_params(rule_type: str, params: dict[str, Any]) -> dict[str, An
 
 
 def run_rules(
-    rules: list[Rule], blocks: list[Block], llm: Callable[[], LlmProvider] | None
+    rules: list[Rule],
+    blocks: list[Block],
+    llm: Callable[[], LlmProvider] | None,
+    progress: Progress | None = None,
 ) -> tuple[list[Violation], ReportSummary]:
     """Run every rule against the document.
 
@@ -41,7 +45,16 @@ def run_rules(
     valid, a regex that runs too long, a checker bug) is listed in `summary.failed_rules`, and the
     other rules' results are still returned. `llm` creates the provider; it is only called when
     there are AI rules, so a missing API key fails those rules and nothing else.
+
+    `progress` receives one step for the built-in rules and one per AI request; raises
+    `CheckCancelled` when it reports a cancellation.
     """
+    progress = progress or NoProgress()
+    has_llm = any(r.type == LLM_RULE_TYPE for r in rules)
+    has_builtin = any(r.type != LLM_RULE_TYPE for r in rules)
+    progress.begin(int(has_builtin) + (count_llm_calls(blocks) if has_llm else 0))
+    if progress.cancelled():
+        raise CheckCancelled
     findings: dict[int, list[Finding]] = {}
     failed: dict[int, str] = {}
     llm_rules: list[tuple[Rule, LlmRule]] = []
@@ -66,12 +79,18 @@ def run_rules(
         except Exception:
             log.exception("Rule %s (%s) failed", rule.id, rule.type)
             failed[rule.id] = "Internal error while checking this rule."
+    if has_builtin:
+        progress.advance("Built-in rules")
+        if progress.cancelled():
+            raise CheckCancelled
 
     if llm_rules:
         try:
             if llm is None:
                 raise LlmError("AI rules need an LLM provider, but none is configured.")
-            findings.update(check_llm_rules(llm(), [lr for _, lr in llm_rules], blocks))
+            findings.update(check_llm_rules(llm(), [lr for _, lr in llm_rules], blocks, progress))
+        except CheckCancelled:
+            raise
         except LlmError as exc:
             failed.update({rule.id: str(exc) for rule, _ in llm_rules})
         except Exception:

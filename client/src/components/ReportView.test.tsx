@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FLASH_MS } from "../lib/motion";
-import { DOC, violation } from "../test/fixtures";
+import { block as makeBlock, DOC, violation } from "../test/fixtures";
 import type { FailedRule, Violation } from "../types";
 import ReportView from "./ReportView";
 
@@ -205,5 +205,28 @@ describe("ReportView", () => {
   it("keeps dir=auto on document text for RTL documents", () => {
     setup();
     expect(block("50 km")).toHaveAttribute("dir", "auto");
+  });
+});
+
+describe("ReportView document regions", () => {
+  it("shows headers and footnotes in their own regions and locates violations there", async () => {
+    const doc = {
+      ...DOC,
+      blocks: [
+        ...DOC.blocks,
+        makeBlock({ id: 10, text: "Classified header: TOP SECRET", part: "header", label: "Header (section 1)" }),
+        makeBlock({ id: 11, text: "Range was 85 km in trials.", part: "footnote", label: "Footnote 1" }),
+      ],
+    };
+    const inNote = violation({ id: "9-0", rule_name: "Figures", message: "Range", block_id: 11, start: 10, end: 15, location: "Footnote 1" });
+    render(<ReportView document={doc} violations={[inNote]} checking={false} checkedAt={null} aiRulesEnabled={0} onCheck={vi.fn()} />);
+
+    expect(within(screen.getByRole("region", { name: "Header" })).getByText("Classified header: TOP SECRET")).toBeInTheDocument();
+    const notes = screen.getByRole("region", { name: "Footnotes" });
+    expect(within(notes).getByText("85 km").tagName).toBe("MARK");
+    expect(screen.queryByRole("region", { name: "Endnotes" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /Figures/ }));
+    expect(within(notes).getByText("85 km")).toHaveAttribute("data-active", "true");
   });
 });

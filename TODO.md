@@ -129,23 +129,23 @@ Measure how many real violations the AI catches (recall) and how many it invents
 - [ ] Baseline report saved in the wiki; then prompt/effort tuning, with each change compared against the baseline
 - **Done when:** a baseline recall/precision is recorded and each prompt change has before/after numbers. ⚠️ Spends quota: run count agreed with you first
 
-## M3 – Background checks with a progress bar — `feature/background-checks`
+## M3 – Background checks with a progress bar — `feature/background-checks` — ✅ done
 Long documents keep the page waiting today (one blocking request).
-- [ ] `POST /documents/{id}/check` returns at once with a check id; the check runs in the background
-- [ ] `check_runs` gets `status` (queued / running / completed / failed / cancelled) and progress (`done_chunks` / `total_chunks`, current step)
-- [ ] `GET /checks/{id}` for status; the client polls (or uses server-sent events) and shows a progress bar: "Checking… chunk 3 of 7 (AI rules)"
-- [ ] Cancel button; a failed check shows its error; the page can be reloaded mid-check and reconnects to the running check
-- [ ] Only one running check per document at a time
+- [x] `POST /documents/{id}/check` returns at once with a check id; the check runs in the background
+- [x] `check_runs` gets `status` (queued / running / completed / failed / cancelled) and progress (`done_chunks` / `total_chunks`, current step)
+- [x] `GET /checks/{id}` for status; the client polls (or uses server-sent events) and shows a progress bar: "Checking… chunk 3 of 7 (AI rules)"
+- [x] Cancel button; a failed check shows its error; the page can be reloaded mid-check and reconnects to the running check
+- [x] Only one running check per document at a time
 - **Done when:** unit tests cover the state transitions, E2E covers progress → result (non-AI rules, with a slow fake), and the API contract + ADR are updated
 
-## M4 – Read more of the document — `feature/parser-coverage`
+## M4 – Read more of the document — `feature/parser-coverage` — ✅ done
 Parts of a .docx are currently ignored, so violations there are never found.
-- [ ] Headers and footers (per section, deduplicated), labelled e.g. "Header (section 1)"
-- [ ] Footnotes and endnotes, labelled "Footnote 3"
-- [ ] Text boxes and shapes
-- [ ] Tables nested inside tables
-- [ ] Hyperlink text and field results (e.g. SEQ caption numbers), which fixes the cross-reference caption limitation
-- [ ] The document view shows these parts in their own sections so highlights still point at the right place
+- [x] Headers and footers (per section, deduplicated), labelled e.g. "Header (section 1)"
+- [x] Footnotes and endnotes, labelled "Footnote 3"
+- [x] Text boxes and shapes
+- [x] Tables nested inside tables
+- [x] Hyperlink text and field results (e.g. SEQ caption numbers), which fixes the cross-reference caption limitation
+- [x] The document view shows these parts in their own sections so highlights still point at the right place
 - **Done when:** a fixture .docx containing every part type is parsed with correct labels and offsets, rules find violations in each part, and the E2E click-to-locate works for a header and a footnote
 
 ## Low priority

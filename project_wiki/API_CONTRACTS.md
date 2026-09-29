@@ -157,3 +157,35 @@ Status: **implemented** (2026-09-29), see ADR-012. The client treats 404 and 405
 - **Layout:** top bar (brand, document name, severity counters). Left sidebar: Rules panel (New rule, **Add from template** picker, **Load Sample Rules** button, enable toggles) and Documents panel (upload, list). Main: **split screen**. Left = document paragraphs with severity highlights (High red, Medium orange, Low yellow). Right = violations list with severity filter chips (with counts) and a rule filter. Clicking a violation smoothly scrolls to the paragraph and **flashes** it (~1.5 s), and it stays marked active.
 - **Architecture:** components render only. Data in hooks (`useRules`, `useDocuments`, `useDocumentReport`, `useRuleTemplates`); pure logic in `lib/`.
 - **Tests:** Vitest for new hooks/components. Playwright E2E against the running stack, using **non-LLM rules only** (never triggers a Gemini call).
+
+---
+
+## Background checks with progress — `feature/background-checks` (M3)
+Status: **implemented** (2026-09-29), see ADR-018.
+
+| Method | Path | Response | Errors |
+|---|---|---|---|
+| POST | `/api/documents/{id}/checks` | `202 CheckStatus`: starts a background check with the enabled rules (or body `{"rule_ids": [...]}`). If the document already has a queued/running check, that check is returned instead (only one active check per document) | 400 no rules, 404 |
+| GET | `/api/documents/{id}/checks/latest` | `CheckStatus` of the newest check in any state (lets a reloaded page reconnect) | 404 never checked |
+| GET | `/api/checks/{check_id}` | `CheckStatus` | 404 |
+| POST | `/api/checks/{check_id}/cancel` | `CheckStatus`. A queued/running check becomes `cancelled`; an AI request already in flight finishes, but its result is discarded and no further requests start. A finished check is returned unchanged | 404 |
+
+The synchronous `POST /api/documents/{id}/check` stays (used by tests and scripts).
+
+```ts
+type CheckState = "queued" | "running" | "completed" | "failed" | "cancelled";
+interface CheckStatus {
+  check_id: number;
+  document_id: number;
+  status: CheckState;
+  progress_done: number;     // steps finished
+  progress_total: number;    // 0 until known; steps = built-in rules (1) + one per AI request
+  step: string | null;       // e.g. "AI rules: part 3 of 7"
+  error: string | null;      // failed: why
+  created_at: string;
+  finished_at: string | null;
+}
+```
+- `completed`: the report is available via `GET /api/documents/{id}/report` (it may list `failed_rules`).
+- `failed`: no rule could run, or an internal error; `error` explains why.
+- Checks that were queued or running when the server stopped are marked `failed` ("Interrupted by a server restart") at startup.
