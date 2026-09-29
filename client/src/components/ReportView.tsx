@@ -2,14 +2,16 @@ import { useMemo } from "react";
 import { useViolationFilters } from "../hooks/useViolationFilters";
 import { useViolationFocus } from "../hooks/useViolationFocus";
 import { violationsByBlock } from "../lib/highlight";
-import type { DocumentFull, Violation } from "../types";
+import type { DocumentFull, FailedRule, Violation } from "../types";
 import DocumentPane from "./DocumentPane";
-import { Button, Icon, Panel } from "./ui";
+import { Button, Icon, Panel, WarningNote } from "./ui";
 import ViolationsPanel from "./ViolationsPanel";
 
 interface Props {
   document: DocumentFull;
   violations: Violation[] | null; // null => not checked yet
+  /** Rules the check could not run; shown so an incomplete report never looks clean. */
+  failedRules?: FailedRule[];
   checking: boolean;
   checkedAt: string | null;
   /** Enabled rules of type `llm`: a check will spend AI quota. */
@@ -18,9 +20,18 @@ interface Props {
 }
 
 const NO_VIOLATIONS: Violation[] = [];
+const NO_FAILED_RULES: FailedRule[] = [];
 
 /** Split screen: document with highlights (left) and the violations list (right). Key it per document/report. */
-export default function ReportView({ document, violations, checking, checkedAt, aiRulesEnabled, onCheck }: Props) {
+export default function ReportView({
+  document,
+  violations,
+  failedRules = NO_FAILED_RULES,
+  checking,
+  checkedAt,
+  aiRulesEnabled,
+  onCheck,
+}: Props) {
   const filters = useViolationFilters(violations ?? NO_VIOLATIONS);
   const focus = useViolationFocus();
   const byBlock = useMemo(() => violationsByBlock(filters.visible), [filters.visible]);
@@ -75,11 +86,32 @@ export default function ReportView({ document, violations, checking, checkedAt, 
           {!checking && violations === null && (
             <p className="text-sm text-slate-400">Not checked yet. Click “Check document”.</p>
           )}
-          {!checking && violations?.length === 0 && (
-            <p role="status" className="rounded-xl bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 ring-1 ring-emerald-500/30">
-              No violations found ✓
-            </p>
+          {!checking && violations && failedRules.length > 0 && (
+            <WarningNote>
+              <p className="font-medium">
+                {failedRules.length} {failedRules.length === 1 ? "rule" : "rules"} could not be checked, so this report is
+                incomplete:
+              </p>
+              <ul aria-label="Rules not checked" className="mt-1 list-disc space-y-0.5 pl-4">
+                {failedRules.map((f) => (
+                  <li key={f.rule_id}>
+                    <span dir="auto" className="font-medium">
+                      {f.rule_name}
+                    </span>
+                    : {f.error}
+                  </li>
+                ))}
+              </ul>
+            </WarningNote>
           )}
+          {!checking && violations?.length === 0 &&
+            (failedRules.length > 0 ? (
+              <p className="text-sm text-slate-400">No violations found by the rules that ran.</p>
+            ) : (
+              <p role="status" className="rounded-xl bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 ring-1 ring-emerald-500/30">
+                No violations found ✓
+              </p>
+            ))}
           {violations && violations.length > 0 && (
             <ViolationsPanel
               violations={filters.visible}

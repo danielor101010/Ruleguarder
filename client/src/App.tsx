@@ -76,6 +76,7 @@ export default function App() {
               key={`${report.document.id}-${report.checkedAt ?? "unchecked"}`}
               document={report.document}
               violations={report.violations}
+              failedRules={report.failedRules}
               checking={report.checking}
               checkedAt={report.checkedAt}
               aiRulesEnabled={aiRulesEnabled}

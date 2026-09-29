@@ -331,6 +331,15 @@ export function ErrorNote({ children, onDismiss }: { children: ReactNode; onDism
   );
 }
 
+export function WarningNote({ children }: { children: ReactNode }) {
+  return (
+    <div role="status" className="flex items-start gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-100 ring-1 ring-amber-400/30">
+      <Icon name="alert" className="mt-0.5 size-4 shrink-0 text-amber-300" />
+      <div className="min-w-0 flex-1 break-words">{children}</div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ icons */
 
 const ICON_PATHS = {

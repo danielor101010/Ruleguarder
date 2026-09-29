@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FLASH_MS } from "../lib/motion";
 import { DOC, violation } from "../test/fixtures";
-import type { Violation } from "../types";
+import type { FailedRule, Violation } from "../types";
 import ReportView from "./ReportView";
 
 const scrollIntoView = vi.fn();
@@ -21,12 +21,13 @@ const SPAN = violation({ id: "1-0", rule_id: 1, rule_name: "No figures", message
 const WHOLE = violation({ id: "2-0", rule_id: 2, rule_name: "Cell rule", message: "Bad cell", block_id: 3 }, "medium");
 const DOC_LEVEL = violation({ id: "3-0", rule_id: 3, rule_name: "Banner", message: "Missing banner", block_id: null, location: "Whole document" }, "low");
 
-function setup(violations: Violation[] | null = [SPAN, WHOLE, DOC_LEVEL], aiRulesEnabled = 0) {
+function setup(violations: Violation[] | null = [SPAN, WHOLE, DOC_LEVEL], aiRulesEnabled = 0, failedRules?: FailedRule[]) {
   const onCheck = vi.fn();
   render(
     <ReportView
       document={DOC}
       violations={violations}
+      failedRules={failedRules}
       checking={false}
       checkedAt={null}
       aiRulesEnabled={aiRulesEnabled}
@@ -170,6 +171,20 @@ describe("ReportView", () => {
     setup([]);
     expect(screen.getByText(/No violations found/)).toBeInTheDocument();
     expect(screen.queryByText(/AI rule/)).toBeNull();
+  });
+
+  it("warns that the report is incomplete when rules could not be checked", () => {
+    setup([SPAN], 1, [{ rule_id: 4, rule_name: "No performance figures", error: "All Gemini models are unavailable right now" }]);
+    expect(screen.getByText(/1 rule could not be checked, so this report is\s+incomplete/)).toBeInTheDocument();
+    const failed = screen.getByRole("list", { name: "Rules not checked" });
+    expect(failed).toHaveTextContent("No performance figures: All Gemini models are unavailable right now");
+    expect(card(/No figures/)).toBeInTheDocument(); // the other rules' results are still shown
+  });
+
+  it("does not claim a clean document when rules could not be checked", () => {
+    setup([], 0, [{ rule_id: 4, rule_name: "AI rule", error: "quota" }]);
+    expect(screen.queryByText(/No violations found ✓/)).toBeNull();
+    expect(screen.getByText("No violations found by the rules that ran.")).toBeInTheDocument();
   });
 
   it("offers the first check when never checked", () => {

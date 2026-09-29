@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api";
 import { DOC, report, violation } from "../test/fixtures";
+import type { Report } from "../types";
 import { useDocumentReport } from "./useDocumentReport";
 
 afterEach(() => {
@@ -23,6 +24,7 @@ describe("useDocumentReport", () => {
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.document).toEqual(DOC));
     expect(result.current.violations).toEqual([v]);
+    expect(result.current.failedRules).toEqual([]); // older servers send no failed_rules
     expect(result.current.loading).toBe(false);
   });
 
@@ -57,6 +59,46 @@ describe("useDocumentReport", () => {
     await act(() => result.current.runCheck());
     expect(result.current.violations).toEqual([]);
     expect(result.current.error).toBeNull();
+  });
+
+  it("exposes the rules a check could not run", async () => {
+    vi.spyOn(api, "latestReport").mockResolvedValue(report([]));
+    const failed = [{ rule_id: 4, rule_name: "No figures", error: "All Gemini models are unavailable right now" }];
+    const partial = report([violation({ id: "2-0" })]);
+    vi.spyOn(api, "check").mockResolvedValue({ ...partial, summary: { ...partial.summary, failed_rules: failed } });
+    const { result } = renderHook(() => useDocumentReport(1));
+    await waitFor(() => expect(result.current.document).toEqual(DOC));
+
+    await act(() => result.current.runCheck());
+    expect(result.current.failedRules).toEqual(failed);
+    expect(result.current.violations).toHaveLength(1);
+  });
+
+  it("drops a check result that arrives after another document was selected", async () => {
+    const other = { ...DOC, id: 2, filename: "other.docx" };
+    vi.spyOn(api, "latestReport").mockImplementation((id) =>
+      Promise.resolve(id === 1 ? report([]) : { ...report([]), document: other }),
+    );
+    let finish: (r: Report) => void = () => undefined;
+    vi.spyOn(api, "check").mockReturnValue(new Promise<Report>((resolve) => (finish = resolve)));
+    const { result, rerender } = renderHook(({ id }) => useDocumentReport(id), { initialProps: { id: 1 as number | null } });
+    await waitFor(() => expect(result.current.document?.id).toBe(1));
+
+    let checking: Promise<void> = Promise.resolve();
+    act(() => {
+      checking = result.current.runCheck();
+    });
+    expect(result.current.checking).toBe(true);
+    rerender({ id: 2 });
+    await waitFor(() => expect(result.current.document?.id).toBe(2));
+
+    await act(async () => {
+      finish(report([violation({ id: "1-0" })]));
+      await checking;
+    });
+    expect(result.current.document?.id).toBe(2);
+    expect(result.current.violations).toEqual([]);
+    expect(result.current.checking).toBe(false);
   });
 
   it("resets when the selection changes", async () => {

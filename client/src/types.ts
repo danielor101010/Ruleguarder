@@ -115,10 +115,24 @@ export interface Violation {
   location: string;
 }
 
+/** A rule that could not be checked (e.g. the AI was unavailable); the report is incomplete without it. */
+export interface FailedRule {
+  rule_id: number;
+  rule_name: string;
+  error: string;
+}
+
 export interface Report {
   check_id: number;
   checked_at: string;
   document: DocumentFull;
   violations: Violation[];
-  summary: { total: number; by_severity: Partial<Record<Severity, number>>; rules_checked: number };
+  summary: {
+    total: number;
+    by_severity: Partial<Record<Severity, number>>;
+    /** Rules that ran successfully. */
+    rules_checked: number;
+    /** Missing from servers built before this field existed. */
+    failed_rules?: FailedRule[];
+  };
 }
