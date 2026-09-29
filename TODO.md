@@ -15,7 +15,8 @@ Branching: one feature branch per task, never commit directly to `dev` / `main`.
 | `feature/rule-templates` | `refactor/severity-levels` | ✅ done, verified (154 tests) |
 | `feature/dashboard-ui` | `refactor/severity-levels` | ✅ done (subagent 2) |
 | `feature/templates-dashboard-integration` | both of the above | ✅ merged + verified |
-| `fix/dashboard-ux` | `feature/templates-dashboard-integration` | ✅ UI redesign from your feedback (current branch) |
+| `fix/dashboard-ux` | `feature/templates-dashboard-integration` | ✅ UI redesign from your feedback |
+| `fix/check-robustness` | `fix/dashboard-ux` | ✅ bug fixes from the code review, verified (current branch) |
 
 ## ✅ Phase 1 – Scaffold (`feature/project-scaffold`)
 - [x] Stack: FastAPI + python-docx + PostgreSQL + React/Vite/TS + Docker (nginx)
@@ -87,6 +88,14 @@ _6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --stri
 - [x] No coloured side borders, no blue rings, no chips
 - [x] Upload drop zone + recent documents; phone layout puts the main area first
 - [x] Tests: client 93 ✅, Playwright 5 passed / 1 skipped ✅
+
+## ✅ Fix – check robustness (`fix/check-robustness`, ADR-015)
+- [x] Partial reports: a failing rule (AI outage, invalid stored params, checker bug, slow regex) no longer sinks the check
+- [x] Crash fixes: quote locating (`İ`/`ß`), malformed .docx (400, no orphan file), PATCH null (422), regex timeout
+- [x] JSON 500s, sample-rules lock, delete ordering, LLM chunk cancel; client race, incomplete-report warning, ErrorBoundary
+- [x] Tests: server 182 ✅, client 99 ✅, Playwright 5 passed / 1 skipped ✅
+- [ ] Refactor: move check orchestration out of the router into a service layer (do it at the start of M3)
+- [ ] Client cancel/timeout for a running check (fits M3's progress bar)
 
 ## Decisions for you (open)
 - [x] `claude.md` §4: left as is (your call); ADR-014 records the dark design

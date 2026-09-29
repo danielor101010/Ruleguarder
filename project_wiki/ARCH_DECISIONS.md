@@ -138,3 +138,42 @@ Format: context → decision → consequences. Newest last. Status: Accepted / S
 - **Empty state:** drag-and-drop upload zone + recent documents. On phones the main area comes before the sidebar.
 
 **Consequences.** ⚠️ This departs from `project_wiki/claude.md` §4 (glassmorphism, `bg-white/70` panels, dark `#0F172A` pill buttons), based on the product owner's direct feedback. `claude.md` is the owner's rules file and was **not** edited; the owner should update §4 or confirm the exception.
+
+## ADR-015 – Failure isolation: partial reports instead of failed checks (Accepted, 2026-09-29)
+**Context.** A code review (2026-09-29) found that one failing piece sank the whole check:
+- A Gemini outage (common on the free tier) returned 502 and discarded every deterministic result.
+- A bare 500 came from any of: a stored rule whose params no longer validate, an `llm` rule without `instruction`, an AI quote containing a character whose lower case is longer (`İ`), or a malformed .docx.
+- A user regex with catastrophic backtracking could block a worker thread with no limit.
+
+**Decision.**
+- `run_rules` isolates every rule:
+  - Failures go to `summary.failed_rules` (`{rule_id, rule_name, error}`); the rest of the report is still returned and stored.
+  - The engine receives a provider **factory**, called only when there are AI rules, so a missing key or an unknown provider fails the AI rules alone.
+  - Unexpected exceptions are logged and shown as "Internal error while checking this rule".
+- Stored params are validated again at check time. An invalid rule gets a message asking to edit and save it.
+- The check fails (502, run stored as `failed`) only when no rule could run, so the last good report stays the latest one.
+- User regexes (`forbidden_text`, `required_text`) run on the `regex` package with a 2 s budget per rule for the whole document (`REGEX_TIMEOUT_SECONDS`).
+- Upload and delete:
+  - An upload is parsed from memory before the file is written. Any parser exception becomes a 400, and the file is removed if the DB insert fails.
+  - Delete commits before removing the file.
+- Other API safeguards:
+  - `RuleUpdate` rejects explicit `null`s (422).
+  - "Load Sample Rules" takes a Postgres advisory lock, so two quick clicks can't create duplicates.
+  - A global handler keeps the `{"detail"}` shape for 500s.
+- When one LLM chunk fails, chunks not yet started are cancelled (saves quota).
+- Client:
+  - The report view lists the failed rules ("this report is incomplete") and never shows "No violations found ✓" in that case.
+  - A check result that arrives after another document was selected is dropped.
+  - A root `ErrorBoundary` replaces a blank page with a message and a reload button.
+
+**Consequences.**
+- A report can now be partial, and the UI says so explicitly.
+- Older clients ignore `failed_rules`, so they may show a partial report as complete: deploy the client together with the server.
+- New runtime dependency: `regex` (plus `types-regex` for mypy).
+- Router behaviour is now unit-tested in-process (`tests/test_api.py`: TestClient + in-memory SQLite + fake provider).
+
+**Still open (design, not bugs):**
+- Check orchestration still lives in the router, not a service layer (needed before background jobs).
+- The engine takes the ORM `Rule`.
+- `check_llm_rules` reads settings itself.
+- No client-side cancel or timeout for a running check (nginx ends it at 600 s → 504).

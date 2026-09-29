@@ -3,7 +3,7 @@
 Base path `/api`. JSON unless noted. Interactive docs: http://localhost:8000/docs.
 Sources of truth: `server/app/schemas.py` (Pydantic) ↔ `client/src/types.ts` (TypeScript). Keep them in sync.
 
-Errors: `{"detail": "<message>"}` with the HTTP status below.
+Errors: `{"detail": "<message>"}` with the HTTP status below. Unexpected server errors keep this shape too: `500 {"detail": "Internal server error"}`.
 
 ---
 
@@ -18,7 +18,7 @@ Errors: `{"detail": "<message>"}` with the HTTP status below.
 | GET | `/api/rules/types` | – | `RuleType[]` | |
 | GET | `/api/rules` | – | `Rule[]` | |
 | POST | `/api/rules` | `RuleCreate` | `201 Rule` | 422 invalid type/params |
-| PATCH | `/api/rules/{id}` | `RuleUpdate` | `Rule` | 404, 422 |
+| PATCH | `/api/rules/{id}` | `RuleUpdate` | `Rule` | 404, 422 (also for an explicit `null`: leave a field out to keep it) |
 | DELETE | `/api/rules/{id}` | – | `204` | 404 |
 
 ## Documents & checks
@@ -28,8 +28,10 @@ Errors: `{"detail": "<message>"}` with the HTTP status below.
 | POST | `/api/documents` | multipart `file` (.docx) | `201 Document` | 400 not .docx / unreadable, 413 > `MAX_UPLOAD_MB` |
 | GET | `/api/documents/{id}` | – | `Document` | 404 |
 | DELETE | `/api/documents/{id}` | – | `204` (also deletes the file and its reports) | 404 |
-| POST | `/api/documents/{id}/check` | `CheckRequest` (optional) | `Report` | 400 no rules, 404, 502 LLM failure |
+| POST | `/api/documents/{id}/check` | `CheckRequest` (optional) | `Report` (possibly partial, see `failed_rules`) | 400 no rules, 404, 502 only when **no** rule could be checked |
 | GET | `/api/documents/{id}/report` | – | latest completed `Report` | 404 never checked |
+
+A rule that can't be checked (AI unavailable or out of quota, stored params no longer valid, a user regex over its 2 s budget, a checker bug) does not fail the check: it is listed in `summary.failed_rules`, and every other rule's result is returned and stored (ADR-015). When every rule failed, the run is stored as `failed`, the response is `502 "No rule could be checked. <reasons>"`, and `GET …/report` keeps returning the previous completed report.
 
 `POST …/check` is synchronous: an LLM check can take up to about `LLM_TIMEOUT_SECONDS` × requests. nginx allows 600 s.
 
@@ -84,8 +86,13 @@ interface Report {
   check_id: number; checked_at: string;
   document: Document;
   violations: Violation[];    // sorted: document-level first, then by block and offset
-  summary: { total: number; by_severity: Partial<Record<Severity, number>>; rules_checked: number };
+  summary: {
+    total: number; by_severity: Partial<Record<Severity, number>>;
+    rules_checked: number;         // rules that ran successfully
+    failed_rules: FailedRule[];    // [] in reports stored before this field existed
+  };
 }
+interface FailedRule { rule_id: number; rule_name: string; error: string }   // error is shown to the user
 ```
 
 ## Rule types and params

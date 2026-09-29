@@ -10,6 +10,29 @@ dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-
 
 ---
 
+## 2026-09-29 – `fix/check-robustness`
+Fixes from a code review of business logic, separation and fallbacks. See ADR-015.
+- **Partial reports:** an AI outage, invalid stored params, a checker bug or a slow regex fail only that rule (`summary.failed_rules`). The check returns 502 only when no rule could run.
+- **Crashes fixed:**
+  - `find_span` IndexError on characters whose lower case is longer (`İ`, `ß`): case folding now keeps an index map;
+  - malformed .docx → 400 instead of 500, and no orphan upload file;
+  - `PATCH` with `null` → 422 instead of an IntegrityError 500;
+  - catastrophic user regex → stopped after 2 s (`regex` package).
+- **Smaller:**
+  - JSON body for 500s;
+  - Postgres advisory lock on `/samples`;
+  - delete commits before removing the file;
+  - queued LLM chunks cancelled after a failure.
+- **Client:**
+  - "incomplete report" warning;
+  - a stale check result is dropped when the selection changed (race);
+  - root `ErrorBoundary`.
+- **Verification** (isolated stack with Postgres):
+  - server: ruff ✅, format ✅, mypy --strict ✅, **182 passed** (+28, incl. new in-process API tests);
+  - client: eslint 0 warnings ✅, tsc ✅, **99 passed** (+6), build ✅;
+  - Playwright: 5 passed, 1 skipped (expected);
+  - live check through nginx with the AI provider disabled: 200, forbidden-text result present, AI rule listed as failed.
+
 ## 2026-09-29 – Product owner check
 - Real AI rules verified by the product owner on `gemini-3.5-flash`: working.
 - `claude.md` §4 stays as is (owner's decision); the app follows ADR-014.
