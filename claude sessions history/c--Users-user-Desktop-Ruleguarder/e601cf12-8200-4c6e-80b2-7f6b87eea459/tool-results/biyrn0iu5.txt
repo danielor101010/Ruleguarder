@@ -1,0 +1,535 @@
+=== project_wiki/claude.md
+---
+name: senior-software-engineer
+description: Enforces professional software engineering standards, strict git branching, automated testing, design-system fidelity, code quality, and Project Wiki (Brain) documentation. Use when designing, writing, testing, or refactoring code.
+---
+
+# Senior Software Engineer & AI-Assisted Development Standards
+
+Whenever fulfilling coding requests, feature additions, bug fixes, or UI changes, you MUST adhere strictly to the following engineering standards, workflows, and documentation rules.
+
+---
+
+## 1. Project Wiki & Knowledge Base ("The Brain")
+Maintain and expand the living knowledge base inside the existing `project_wiki/` folder at the root of the project. This serves as the project's brain, logging all architectural decisions, technical specs, and development progress.
+
+- **Project Wiki Folder Structure (`/project_wiki`):**
+  - `project_wiki/ARCH_DECISIONS.md`: Log Architecture Decision Records (ADRs) for major choices (e.g., Gemini integration, PDF/DOCX parsing engine, caching layer).
+  - `project_wiki/DEVELOPMENT_LOG.md`: Chronological log of features built, bugs fixed, and active branch progress.
+  - `project_wiki/PROMPT_PLAYBOOK.md`: Record of technical prompts, specs, and engineering instructions used during development.
+  - `project_wiki/API_CONTRACTS.md`: Documented endpoints, Pydantic/TypeScript models, and response formats.
+- **Auto-Update Rule:** Every time a feature, bugfix, or architectural change is completed, you MUST update or create the relevant `.md` files inside the `project_wiki/` folder to reflect the new state of the system before finalizing the task.
+
+---
+
+## 2. Git Workflow & Branching Strategy
+- **NO Direct Commits to Main/Dev:** Never write or apply changes directly on `main`, `master`, or `dev` branches.
+- **Feature Branch Naming:** Always instruct or create a new dedicated feature branch using the pattern:
+  - `feature/<short-description>` (e.g., `feature/glassmorphism-ui-redesign`)
+  - `fix/<short-description>` (e.g., `fix/jwt-token-expiration`)
+  - `refactor/<short-description>`
+- **Atomic & Conventional Commits:** Group changes cleanly. Use Conventional Commit messages: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `style:`.
+
+---
+
+## 3. Specification-First & Architecture
+- **Spec First:** Before writing complex features, outline a quick Technical Plan (Architecture, Data Models, API Contracts, Constraints) and save or update it in `project_wiki/`.
+- **Type Safety & Strict Contracts:**
+  - TypeScript: Strict types, no implicit `any`, define explicit `interface` / `type` for API requests/responses.
+  - Python: Use type hints (`mypy` compatible) and `Pydantic` models for data validation.
+- **Clean Architecture & Separation of Concerns:** Keep UI components presentation-only, extract logic into custom hooks/services, and maintain clean API controllers.
+
+---
+
+## 4. UI/UX & Design System Rules
+- **Design System Fidelity:** Follow the project's exact design language (Modern Glassmorphism / Tailwind CSS tokens).
+- **Design Principles:**
+  - Clean whitespace, modern hierarchy, and generous border-radii (`rounded-2xl` / `rounded-3xl`).
+  - Subtle frosted glass panels (`backdrop-blur-md bg-white/70 border border-white/40`).
+  - Dark accent buttons (`#0F172A` / `#000000`) with pill shapes (`rounded-full`).
+- **Responsive & Accessible:** Ensure mobile responsiveness and accessible color contrast.
+
+---
+
+## 5. Automated Testing & Quality Assurance (Mandatory)
+Every feature or code modification MUST be accompanied by corresponding automated tests:
+- **Unit Tests:** Test individual components, hooks, functions, or utility classes (Vitest / Jest / Pytest).
+- **Integration & API Tests:** Test API endpoints, data flow, and error states.
+- **Edge Cases & Error Handling:** Include tests for unexpected inputs, missing data, network timeouts, and unauthorized requests.
+- **Test Command Verification:** Always output the exact test execution command (e.g., `npm run test` or `pytest`) and ensure all tests pass before considering a task complete.
+
+---
+
+## 6. CI/CD & Code Hygiene
+- **Zero Warnings:** Ensure code passes all static checks:
+  - Linter (ESLint / Biome / Ruff)
+  - Type-checker (`tsc --noEmit` / `mypy`)
+- **No Console Leftovers:** Remove `console.log`, `print()` statements, or debug code before finishing.
+- **Self-Review:** Perform an internal Code Review for potential memory leaks, security vulnerabilities, or performance bottlenecks.
+
+---
+
+## 7. How to Structure Responses & Output
+When completing a task, organize your output logically:
+1. **Branch & Scope:** State the active feature branch name.
+2. **Implementation Summary:** Brief technical summary of what was built/modified.
+3. **Tests Added:** Show newly added unit/integration tests and execution results.
+4. **Project Wiki Updates:** List the updated/created Markdown files in the `project_wiki/` folder.
+5. **Validation Command:** Provide the exact command to run the test suite and verify the build.=== project_wiki/ARCH_DECISIONS.md
+# Architecture Decision Records
+
+Format: context → decision → consequences. Newest last. Status: Accepted / Superseded.
+
+---
+
+## ADR-001 – Tech stack (Accepted, 2026-09-29)
+**Context.** We need to read .docx files with structure (paragraphs, headings, tables, fonts), check them against rules, and show violations in a browser.
+**Decision.**
+- Server: Python 3.12 + FastAPI + Pydantic. Python has the most mature DOCX tooling (`python-docx`).
+- DB: PostgreSQL 16 + SQLAlchemy 2.0. Tables are created on startup for now (`create_all`); Alembic comes later.
+- Client: React 18 + TypeScript (strict) + Vite.
+- Infra: Docker Compose with `db`, `server`, `client` (nginx) and a dev override for hot reload.
+
+**Consequences.** One language for parsing and rules. The schema is not migrated yet, so any schema change needs a DB reset until Alembic is added.
+
+## ADR-002 – Document model: ordered blocks with character offsets (Accepted)
+**Context.** Violations must point at an exact place in the document.
+**Decision.** The parser flattens the document into ordered **blocks**: body paragraphs, headings, and each paragraph inside a table cell. Each block has `id`, `text`, a human-readable `label` ("Paragraph 4" / "Table 1, row 2, column 3"), `heading_context` (the nearest heading above it) and `runs`. Runs carry `start`/`end` offsets into `text` plus the resolved font and size (run → character style → paragraph style → document defaults). The parsed blocks are stored as JSON on the `documents` row.
+**Consequences.** Every rule, deterministic or LLM, reports `(block_id, start, end)`, and the client highlights exactly that span. Headers, footers, footnotes, text boxes and nested tables are not parsed yet.
+
+## ADR-003 – Hybrid rule engine: LLM rules + deterministic rules (Accepted)
+**Context.** The main use case is rules written in natural language ("no numeric figures revealing system performance"), which regex can't express. LLMs can't see formatting (fonts, sizes) and cost money per call.
+**Decision.** Rule type `llm` holds a plain-language instruction checked by the LLM. Deterministic types (`forbidden_text`, `required_text`, `max_sentence_words`, `max_paragraph_words`, `allowed_fonts`, `font_size_range`) run in code: free, exact and instant. Each type declares a Pydantic params model, and the client renders its form from that JSON schema (`GET /api/rules/types`).
+**Consequences.** Adding a deterministic rule type needs no client change.
+
+## ADR-004 – LLM returns verbatim quotes; the server computes offsets (Accepted)
+**Context.** LLMs are unreliable at character offsets, and may paraphrase or invent text.
+**Decision.** The LLM gets numbered blocks and returns `{rule_id, block_id, quote, explanation}` via structured output. The server finds `quote` in the block text (then in the other blocks of the same chunk), tolerating curly/straight quotes, Hebrew gershayim/geresh, dashes, whitespace and case. If the quote isn't found, the whole block is flagged and the quote is shown in the message. Unknown rule ids and duplicates are dropped. `block_id = -1` means a document-level violation.
+**Consequences.** Highlights always point at real text. A hallucinated quote degrades to a paragraph-level flag instead of a wrong highlight.
+
+## ADR-005 – Stored check reports (`check_runs`) (Accepted)
+**Decision.** Every check is stored with its status, violations and summary. `GET /api/documents/{id}/report` returns the latest completed one.
+**Consequences.** Re-opening a document doesn't spend LLM quota again.
+
+## ADR-006 – nginx in front of the client (Accepted)
+**Decision.** The production client is static files served by nginx, which proxies `/api` to the server, so the app has one origin (no CORS, no hardcoded API URL). Dev uses Vite's proxy instead.
+**Alternative considered.** FastAPI serving the built files: one container fewer, but it mixes frontend deployment into the API image.
+
+## ADR-007 – LLM provider: Google Gemini (Accepted; supersedes the initial Claude provider)
+**Context.** The product owner chose Google AI Studio with a free Gemini API key.
+**Decision.** `google-genai` SDK, `models.generate_content` with native structured output (`response_mime_type="application/json"` + Pydantic `response_schema`). Automatic function calling is disabled (no tools are used). The provider sits behind the `LlmProvider` protocol (`app/llm/base.py`), selected by `LLM_PROVIDER`.
+**Consequences.**
+- ⚠️ **Data:** on the free tier, Google may use submitted content to improve its products. Confidential documents need organisational approval or a paid / Vertex AI project. The provider interface allows a self-hosted model later.
+- `gemini-1.5-*` models no longer exist; see ADR-008 for the model choice.
+
+## ADR-008 – Model choice, fallback and quota safety (Accepted, 2026-09-29)
+**Context.** Measured on the free tier (2026-09-29): `gemini-3.8-flash` timed out / 503; `gemini-3.7-flash` 503 (overloaded); `gemini-3.5-flash` OK (~14 s for a trivial prompt); `gemini-3.5-flash-lite` OK (~0.6 s); `gemini-3.1-pro-preview` 429 (no free-tier quota). An early retry policy (4 retries × parallel calls) multiplied requests and wasted free-tier quota.
+**Decision.**
+- Default model `gemini-3.5-flash`.
+- Optional `LLM_FALLBACK_MODELS`, empty by default. On 503/504/timeout, go straight to the next model with no retry on the same one.
+- Only 429 is retried, `LLM_MAX_RETRIES=1` by default, with exponential backoff.
+- `LLM_TIMEOUT_SECONDS=120`, `LLM_MAX_PARALLEL=1`.
+- Worst case per LLM call: `(max_retries + 1) × number_of_models` requests. A unit test enforces this.
+- Real-LLM tests never run by default (`addopts = -m "not llm"`); opt in with `pytest -m llm`.
+
+**Consequences.** Predictable quota use. A check can fail with "all models unavailable" when Google is overloaded; the error names each model and its status.
+
+## ADR-009 – Quality gates (Accepted, 2026-09-29)
+**Context.** The project wiki requires zero lint/type warnings and tests with every change.
+**Decision.**
+- Server: Ruff (`E,F,W,I,B,UP,SIM,RUF`, line length 120) + Ruff format + **mypy --strict** with the pydantic plugin (`server/pyproject.toml`). Test code relaxes `disallow_untyped_defs/calls` and `warn_return_any`, since fixtures don't need annotations. The `tests` image runs every gate: `ruff check && ruff format --check && mypy && pytest`.
+- Client: ESLint 10 flat config (`@eslint/js` recommended + `typescript-eslint` strict + `react-hooks` 7, including React Compiler rules) with `--max-warnings 0`; `tsc --noEmit`; Vitest + Testing Library + jsdom. `npm run check` runs all three.
+- Clean architecture: pure logic lives in `client/src/lib/` (`highlight.ts`, `layout.ts`) and data flow in hooks (`hooks/useDocumentReport.ts`); components render only.
+- No `setState` inside effects: selection resets happen during render (hook) or through a React `key` (`ReportView`).
+
+**Consequences.** jsdom is pinned to 25 because jsdom 26+ needs Node ≥ 24.15 (local Node is 24.11). One npm deprecation warning remains from a transitive jsdom dependency (`whatwg-encoding`), which is not our code.
+
+## ADR-010 – Severity levels high / medium / low (Accepted, 2026-09-29)
+**Context.** The product owner wants High = red, Medium = orange, Low = yellow. The API used error / warning / info.
+**Decision.** `Severity = Literal["low", "medium", "high"]` with a Pydantic `BeforeValidator` that maps the legacy names (error→high, warning→medium, info→low). Stored reports are therefore upgraded on read, and `ReportSummary.by_severity` keys are merged. Stored rules are rewritten once at startup by `app/migrations.py::upgrade_legacy_severities` (idempotent). The default severity is `high`.
+**Consequences.** Old clients sending legacy names keep working. Colours: high `#dc2626`, medium `#ea580c`, low `#a16207` (yellow-700, chosen for text contrast on light backgrounds).
+
+## ADR-011 – Rule templates and sample rules (Accepted, 2026-09-29)
+**Context.** New users start with an empty rule list and have to learn every rule type's params. The product owner asked for an "Add from template" picker, a one-click "Load Sample Rules" button, and three more deterministic checks (PII, acronym definitions, cross-references).
+**Decision.**
+- Templates live in server code, `app/rules/templates.py` (`RULE_TEMPLATES`, 11 templates, 6 in the sample set), as the single source of truth; the client only renders `GET /api/rules/templates`. Each template carries a complete `RuleCreate`. Template params go through `validate_rule_params` at import, so a broken template fails at startup.
+- `POST /api/rules/samples` is idempotent by rule **name**: existing names are skipped, never overwritten, so a user's edits survive a second click. The AI sample rule is created **disabled** (ADR-008, quota).
+- The new checkers are precision-first: they need written structure (dashed SSN, separators or "+" in phone numbers, a Luhn-valid card number with a known prefix, an explicit "Full Name (ABC)", a caption or heading target). Section targets include an outline number recomputed from heading levels, because Word's automatic numbering isn't in the text.
+- Larger checkers live in their own modules (`pii.py`, `acronyms.py`, `cross_references.py`); `Finding` moved to `app/rules/finding.py` to avoid an import cycle.
+
+**Consequences.**
+- Templates change only through a deploy (no admin UI). A renamed sample rule is created again on the next "Load Sample Rules".
+- Known false positives / misses:
+  - part numbers like "0301-2345-678" are read as phones;
+  - undashed SSNs and unseparated phone numbers are missed;
+  - "API SDK" written side by side is skipped;
+  - "Chapter N" references are not checked;
+  - Word SEQ caption fields are not in the parsed text (caption position is used instead).
+- ⚠️ **PII masking is cosmetic, not data protection** (found in integration review). The violation **message** is masked (`•••• 1111`), but the **excerpt** and the stored document blocks contain the full value, and both are kept in the DB and shown in the UI. Protecting stored PII would need excerpt masking plus encryption or retention rules for documents: **open decision for the product owner**.
+
+## ADR-012 – Dashboard UI: Tailwind v4 tokens, glass surfaces, hook/lib split (Accepted, 2026-09-29)
+**Context.** The spec asks for a dark dashboard with glass surfaces, a split-screen report, filters and click-to-locate, and template/sample features built in parallel with their endpoints.
+**Decision.**
+- Tailwind CSS v4 via `@tailwindcss/vite` (its peer range covers Vite 5; no PostCSS or `tailwind.config.js`). Tokens live in the `styles.css` `@theme`: accent `#0F172A`, `navy-950`, the severity colours (ADR-010), `animate-flash` (1.5 s). Per-severity class sets are literal strings in `lib/severity.ts` so Tailwind's scanner finds them.
+- Surfaces: `GlassPanel` = `rounded-3xl border-white/40 bg-white/70 backdrop-blur-md` over a slate-950→navy gradient; primary buttons are dark `rounded-full` pills; a global `:focus-visible` outline; reduced motion is respected. `dir="auto"` stays on all document text.
+- Components render only; state/data in hooks (`useRules`, `useDocuments`, `useRuleTemplates`, `useDocumentReport`, `useViolationFilters`, `useViolationFocus`); pure logic in `lib/`.
+- Flash = a keyed overlay element remounted on each click (restarts the animation); `data-active` / `data-flash` / `aria-current` are the stable test hooks.
+- Optional endpoints: 404 **and** 405 mean "not provided" (FastAPI answers 405 when a static path collides with `/{rule_id}`); the UI hides the feature instead of erroring.
+- E2E: Playwright (`mcr.microsoft.com/playwright:v1.63.0-noble`) on the compose network (`docker-compose.e2e.yml`); the .docx is generated at test time; non-LLM rules only, with a guard that fails if any enabled `llm` rule exists before a check.
+
+**Consequences.** No custom CSS classes to maintain; a new severity needs a token and a `SEVERITY_CLASSES` entry. Array params (e.g. `pii.categories`) are entered as comma-separated text: no multi-select yet.
+
+## ADR-013 – Parallel subagents with worktree isolation (Accepted, 2026-09-29)
+**Context.** The product owner asked to run the next tasks with subagents.
+**Decision.**
+- Spec first: the lead writes the contract into `API_CONTRACTS.md` before starting the agents.
+- Each agent works in its own git worktree and branch, with its own Docker compose project and ports, and a `.env` copied from `.env.example` (placeholder key, so no LLM calls are possible).
+- Agents do not edit the wiki, TODO or README; they return wiki notes in their report.
+- The lead verifies each branch independently (fresh DB, all gates), merges into an integration branch, runs every gate together in a separate worktree, reviews screenshots, and writes the wiki.
+
+**Consequences.** Integration found issues neither agent could see alone: a Playwright locator built from an unescaped label, and the PII masking overstatement. Both agents' worktrees started at the initial commit instead of the intended base; both noticed and branched from the right commit, so the lead should check the base on every hand-back.
+=== project_wiki/API_CONTRACTS.md
+# API Contracts
+
+Base path `/api`. JSON unless noted. Interactive docs: http://localhost:8000/docs.
+Sources of truth: `server/app/schemas.py` (Pydantic) ↔ `client/src/types.ts` (TypeScript). Keep them in sync.
+
+Errors: `{"detail": "<message>"}` with the HTTP status below.
+
+---
+
+## Health
+| Method | Path | Response |
+|---|---|---|
+| GET | `/api/health` | `{"status": "ok"}` |
+
+## Rules
+| Method | Path | Body | Response | Errors |
+|---|---|---|---|---|
+| GET | `/api/rules/types` | – | `RuleType[]` | |
+| GET | `/api/rules` | – | `Rule[]` | |
+| POST | `/api/rules` | `RuleCreate` | `201 Rule` | 422 invalid type/params |
+| PATCH | `/api/rules/{id}` | `RuleUpdate` | `Rule` | 404, 422 |
+| DELETE | `/api/rules/{id}` | – | `204` | 404 |
+
+## Documents & checks
+| Method | Path | Body | Response | Errors |
+|---|---|---|---|---|
+| GET | `/api/documents` | – | `DocumentSummary[]` (newest first) | |
+| POST | `/api/documents` | multipart `file` (.docx) | `201 Document` | 400 not .docx / unreadable, 413 > `MAX_UPLOAD_MB` |
+| GET | `/api/documents/{id}` | – | `Document` | 404 |
+| DELETE | `/api/documents/{id}` | – | `204` (also deletes the file and its reports) | 404 |
+| POST | `/api/documents/{id}/check` | `CheckRequest` (optional) | `Report` | 400 no rules, 404, 502 LLM failure |
+| GET | `/api/documents/{id}/report` | – | latest completed `Report` | 404 never checked |
+
+`POST …/check` is synchronous: an LLM check can take up to about `LLM_TIMEOUT_SECONDS` × requests. nginx allows 600 s.
+
+---
+
+## Models
+
+```ts
+type Severity = "low" | "medium" | "high";   // legacy input "info" | "warning" | "error" is accepted and mapped
+
+interface RuleCreate {
+  name: string;               // 1..200
+  description?: string;
+  type: string;               // key from /api/rules/types
+  params: Record<string, unknown>;   // validated against the type's params schema
+  severity?: Severity;        // default "high"
+  enabled?: boolean;          // default true
+}
+type RuleUpdate = Partial<Pick<RuleCreate, "name" | "description" | "params" | "severity" | "enabled">>;
+interface Rule extends Required<RuleCreate> { id: number; created_at: string }
+
+interface RuleType {
+  key: string; label: string; description: string;
+  params_schema: { properties: Record<string, ParamSchema>; required?: string[] };  // Pydantic JSON schema
+}
+
+interface Run   { start: number; end: number; text: string; font: string | null; size_pt: number | null;
+                  bold: boolean | null; italic: boolean | null }
+interface Block { id: number; kind: "paragraph" | "heading" | "table_cell"; text: string; style: string | null;
+                  heading_level: number | null;   // 0 = Title
+                  heading_context: string | null; label: string;
+                  paragraph_index: number | null; table_index: number | null; row: number | null; col: number | null;
+                  runs: Run[] }
+
+interface DocumentSummary { id: number; filename: string; size_bytes: number; uploaded_at: string }
+interface Document extends DocumentSummary { blocks: Block[] }
+
+interface CheckRequest { rule_ids?: number[] | null }   // null/omitted => all enabled rules
+
+interface Violation {
+  id: string;                 // "<rule_id>-<n>", unique within a report
+  rule_id: number; rule_name: string; severity: Severity;
+  message: string;
+  block_id: number | null;    // null => whole document
+  start: number | null;       // null (with block_id set) => whole block flagged
+  end: number | null;
+  excerpt: string;            // text around the span
+  location: string;           // e.g. 'Paragraph 4, under "Performance"'
+}
+
+interface Report {
+  check_id: number; checked_at: string;
+  document: Document;
+  violations: Violation[];    // sorted: document-level first, then by block and offset
+  summary: { total: number; by_severity: Partial<Record<Severity, number>>; rules_checked: number };
+}
+```
+
+## Rule types and params
+| key | Checked by | params |
+|---|---|---|
+| `llm` | LLM | `instruction: string` (min 3) |
+| `forbidden_text` | code | `pattern: string`, `is_regex: bool = false`, `case_sensitive: bool = false` |
+| `required_text` | code | same as above; a violation is document-level |
+| `max_sentence_words` | code | `max_words: int > 0` |
+| `max_paragraph_words` | code | `max_words: int > 0` |
+| `allowed_fonts` | code | `fonts: string[]` (min 1) |
+| `font_size_range` | code | `min_pt: float = 0`, `max_pt: float = 200` (min ≤ max) |
+| `pii` | code | `categories: ("ssn" \| "phone" \| "email" \| "credit_card")[]` (default all) |
+| `acronym_definitions` | code | `min_length: int = 2`, `max_length: int = 6`, `ignore: string[]` |
+| `cross_references` | code | `kinds: ("section" \| "figure" \| "table")[]` (default all) |
+
+## Internal LLM contract
+`LlmProvider.find_violations(rules: LlmRule[], blocks: LlmBlock[]) -> LlmViolation[]`, where `LlmViolation = {rule_id, block_id | None, quote, explanation}`. See ADR-004 for how quotes become offsets.
+
+---
+
+## Rule templates & sample rules — `feature/rule-templates`
+Status: **implemented** (2026-09-29). Refinements made during implementation:
+- `pii`: SSN is US and dashed only; credit cards need a known card prefix as well as Luhn; each span is reported under one category (email > card > SSN > phone); masking keeps the last 4 (SSN, card) or last 2 (phone) digits. **Excerpts are not masked** (ADR-011).
+- `acronym_definitions`: `max_length` ≤ 20 and `min_length` ≤ `max_length`; the acronym needs ≥ 2 letters; headings, runs of 2+ all-caps words (markings) and Roman numerals are skipped; the full name must plausibly expand the acronym.
+- `cross_references`: "Figure N" starts a caption only when followed by `:`, `.`, a dash or end of text; "Fig" without a dot is accepted; "Section N of <Capitalised>" is treated as external; lists/ranges are checked number by number (range endpoints only).
+- `POST /samples`: `skipped` = names already present (exact, case-sensitive). The markings sample uses `case_sensitive: true`.
+- JSON schema for list params: `{"type":"array","items":{"enum":[...],"type":"string"}}`.
+- Both static routes are registered before `/{rule_id}` (otherwise FastAPI answers 405).
+
+### New deterministic rule types
+| key | params | Finding |
+|---|---|---|
+| `pii` | `categories: ("ssn" \| "phone" \| "email" \| "credit_card")[]` (default: all four, min 1) | One per match, at the exact span. The message names the category and **masks** the value (e.g. `Credit card number (•••• 1111)`, `Email address (j•••@example.com)`) |
+| `acronym_definitions` | `min_length: int = 2`, `max_length: int = 6`, `ignore: string[]` (default common tokens, e.g. `["OK","PDF","USA","UK","EU","ID","TV","AM","PM"]`) | Only the **first occurrence** of each acronym (all-caps token, digits allowed after the first letter) that is not defined there. Defined = written as `Full Name (ABC)` or `ABC (Full Name)` at that first occurrence. One finding per acronym |
+| `cross_references` | `kinds: ("section" \| "figure" \| "table")[]` (default all) | One per reference (`Section 3.2`, `see Figure 4`, `Table 2`, case-insensitive; `Sec.`/`Fig.` abbreviations) whose target doesn't exist. Targets: **section** = a heading whose text starts with that number, or whose computed outline number (from heading levels; Title excluded) matches; **figure** = a caption paragraph (style `Caption`, or text starting `Figure N`); **table** = a caption `Table N`, or the N-th table in the document. A caption itself is not a reference |
+
+### New endpoints
+| Method | Path | Response |
+|---|---|---|
+| GET | `/api/rules/templates` | `RuleTemplate[]` |
+| POST | `/api/rules/samples` | `201 { created: Rule[], skipped: string[] }`: creates every template with `in_sample_set: true`, skipping names that already exist (idempotent) |
+
+```ts
+interface RuleTemplate {
+  id: string;                 // stable slug, e.g. "pii-all"
+  label: string;
+  description: string;
+  category: "security" | "privacy" | "style" | "structure" | "ai";
+  in_sample_set: boolean;
+  rule: RuleCreate;           // ready to POST /api/rules (the UI may let the user edit it first)
+}
+```
+Sample set: PII (all), acronym definitions, cross-references, forbidden classification markings (regex `\b(TOP SECRET|CONFIDENTIAL|RESTRICTED)\b`), max sentence length 40, **and** an AI rule "No performance figures". The AI rule is created **disabled** (`enabled: false`) because running it spends LLM quota.
+
+---
+
+## Dashboard UI — `feature/dashboard-ui`
+Status: **implemented** (2026-09-29), see ADR-012. The client treats 404 and 405 on optional endpoints as "not provided".
+- **Stack:** Tailwind CSS (Vite plugin); `styles.css` is replaced. English, LTR.
+- **Design:** dark slate/navy dashboard shell (`slate-950` → navy gradient). Content surfaces use the wiki's glass tokens (`backdrop-blur-md bg-white/70 border border-white/40 rounded-2xl/3xl`); primary buttons are dark pills (`#0F172A`, `rounded-full`). Accessible contrast and visible focus rings.
+- **Layout:** top bar (brand, document name, severity counters). Left sidebar: Rules panel (New rule, **Add from template** picker, **Load Sample Rules** button, enable toggles) and Documents panel (upload, list). Main: **split screen**. Left = document paragraphs with severity highlights (High red, Medium orange, Low yellow). Right = violations list with severity filter chips (with counts) and a rule filter. Clicking a violation smoothly scrolls to the paragraph and **flashes** it (~1.5 s), and it stays marked active.
+- **Architecture:** components render only. Data in hooks (`useRules`, `useDocuments`, `useDocumentReport`, `useRuleTemplates`); pure logic in `lib/`.
+- **Tests:** Vitest for new hooks/components. Playwright E2E against the running stack, using **non-LLM rules only** (never triggers a Gemini call).
+=== project_wiki/DEVELOPMENT_LOG.md
+# Development Log
+
+Newest first. Branch chain so far (nothing merged into `dev` / `main` yet):
+
+```
+dev → feature/project-scaffold → feature/gemini-integration → feature/e2e-tests → fix/gemini-overload-fallback → feature/quality-gates → refactor/severity-levels
+   ├→ feature/rule-templates  (subagent 1) ─┐
+   └→ feature/dashboard-ui    (subagent 2) ─┴→ feature/templates-dashboard-integration
+```
+
+---
+
+## 2026-09-29 – `feature/templates-dashboard-integration` (lead)
+- Merged `feature/rule-templates` and `feature/dashboard-ui` (no conflicts).
+- **Verification:** templates branch re-run by the lead on a fresh DB (154 passed). Integrated stack in a separate worktree with a placeholder key:
+  - server: ruff ✅, format ✅, mypy --strict ✅, **154 passed**
+  - client: eslint 0 warnings ✅, tsc ✅, **86 passed**, build ✅
+  - Playwright: **5 passed, 1 skipped** (the skip is the "endpoints missing" fallback test, correct now that the endpoints exist)
+- **Bugs found in integration:**
+  - The Playwright template test built a RegExp from an unescaped label ("No personal data (PII)"), so it never matched once the real endpoints existed. Fixed with `escapeRegExp`. A first attempt had broken escaping; ESLint caught it, and it was fixed in a follow-up commit.
+  - PII masking is cosmetic (full values remain in excerpts and stored documents); recorded in ADR-011 as an open decision.
+- **Demo check** (sample rules, placeholder key, AI rule off): a test .docx produced 9 violations (5 high, 2 medium, 2 low), all correctly located and masked in messages. Screenshots were reviewed at 1440 px and 390 px.
+- Housekeeping: `*.tsbuildinfo` untracked and ignored; `.claude/worktrees/` ignored; agent worktrees, temporary stacks and images removed. The main app on :8080 was rebuilt to this version; the user's 2 rules were kept and upgraded to the new severity names.
+
+## 2026-09-29 – `feature/dashboard-ui` (subagent 2)
+- Tailwind v4 dashboard: dark slate/navy shell, glass panels, dark pill buttons, focus rings; stacks below `lg`. See ADR-012.
+- Split screen: document with High/Medium/Low highlights | violations with severity chips (counts) and a rule filter; document-level violations first. A click smooth-scrolls, flashes for 1.5 s and keeps the paragraph active; clicking a highlight selects its card.
+- Rules sidebar: "Add from template", "Load Sample Rules" ("N added, M already present"), "AI · uses quota" badge; new blank rules default to a non-AI type; template features hide on 404/405.
+- **Tests:** client 86 (+54); Playwright E2E in Docker (`docker-compose.e2e.yml`).
+
+## 2026-09-29 – `feature/rule-templates` (subagent 1)
+- New deterministic rule types:
+  - `pii` (email, credit card with Luhn + prefix, US SSN, phone; masked messages);
+  - `acronym_definitions`;
+  - `cross_references` (section/figure/table, computed outline numbers, captions, lists/ranges).
+- `RULE_TEMPLATES` (11, 6 in the sample set); `GET /api/rules/templates`, `POST /api/rules/samples` (idempotent by name, AI sample disabled).
+- **Tests:** server 154 (+96, incl. many negative PII cases: dates, versions, "50 km", IPs, ISBN).
+
+## 2026-09-29 – `refactor/severity-levels`
+- error / warning / info → **high / medium / low** across API, DB, client and CSS (red / orange / yellow). See ADR-010.
+- Legacy values accepted on input and upgraded on read; stored rules upgraded at startup (idempotent, verified against Postgres).
+- **Tests:** server 58 passed (+8: legacy mapping, rejection of unknown values, default, summary key merge, SQLite migration incl. idempotency); client 32 passed.
+
+## 2026-09-29 – `feature/quality-gates`
+- **Server:** Ruff + strict mypy added; 8 lint and 31 type findings fixed. The rule registry is now typed per params model. `zip(strict=True)` in LLM result merging. Explicit `bool` in style resolution.
+- **Client:** ESLint 10 + `tsc --noEmit` + Vitest. 9 lint findings fixed:
+  - `setState` in effects (App, ReportView) → `useDocumentReport` hook + keyed `ReportView`
+  - non-null assertions → typed `SpanViolation`
+  - `void` generic in the API client → `requestNoContent`
+  - a dynamic heading tag flagged by the React Compiler → `createElement`
+- Logic extracted to `lib/highlight.ts`, `lib/layout.ts`, `hooks/useDocumentReport.ts`.
+- **Tests:** server 50 passed; client 32 passed (highlight segmentation incl. overlaps/clamping, table layout incl. merged cells, API client errors/204/network failure, report hook incl. the 404 → bare-document fallback and failed checks, ReportView highlight/click-to-scroll/counts).
+
+## 2026-09-29 – `fix/gemini-overload-fallback`
+**Problem.** The real-Gemini E2E test took 154 s. Logs showed `gemini-3.8-flash` answering 503 "high demand" repeatedly, and each 503 took up to ~40 s to arrive. The retry policy (4 retries, 2 parallel calls) multiplied requests. About 21 real requests were spent during diagnosis, without asking the product owner first. That was a process mistake, now prevented by the changes below.
+**Changes.**
+- Default model `gemini-3.5-flash` (verified working on the free tier).
+- Model fallback chain (`LLM_FALLBACK_MODELS`, empty by default): 503/504/timeout go to the next model immediately.
+- Only 429 is retried; `LLM_MAX_RETRIES=1`, `LLM_MAX_PARALLEL=1`, `LLM_TIMEOUT_SECONDS=120`.
+- Automatic function calling disabled, which removes the SDK warning logged on every call.
+- Real-LLM tests are opt-in only (`pytest -m llm`).
+- Unit tests for fallback, timeout, rate limiting, bounded request count, error messages.
+
+**Tests.** 50 passed, 1 deselected (real LLM).
+**Process rule adopted.** No real LLM API calls without the product owner's explicit OK.
+
+## 2026-09-29 – Real-Gemini E2E run (on `feature/e2e-tests`)
+- `test_llm_rule_finds_performance_figures` **passed** against real Gemini: it found "50 km", "3 m", and "2 seconds" inside a table cell. It took 154 s because of 503 retries; fixed above.
+
+## 2026-09-29 – `feature/e2e-tests`
+- pytest suite: parser, deterministic rules, LLM pipeline (fake provider), Gemini provider (mocked SDK).
+- E2E tests through the running API using a generated sample .docx (`tests/sample_doc.py`).
+- `tests` compose service (profile `test`), built from a `test` stage in `server/Dockerfile`.
+- **Bug fixed:** the parser silently dropped table cells. Merged-cell dedup used `id()` of short-lived lxml proxies, so ids were reused; it now keeps the element objects themselves. A regression test was added for merged cells.
+- The DB port is no longer published in prod (it clashed with a local Postgres); dev publishes 5433.
+- Full stack verified: http://localhost:8080 → nginx → API → Postgres.
+
+## 2026-09-29 – `feature/gemini-integration`
+- Replaced the Anthropic SDK with `google-genai`; structured output with a Pydantic schema.
+- `GEMINI_API_KEY` + `LLM_*` settings; free-tier data-use warning in `.env.example`.
+- `.gitattributes` forces LF (the Windows checkout converted to CRLF).
+
+## 2026-09-29 – `feature/project-scaffold`
+- DOCX parser, rule registry (deterministic + LLM), LLM chunking and quote locator, rule engine.
+- API: rules CRUD, rule types, documents upload/list/get/delete, check, latest report.
+- React client: rules panel (schema-driven form), documents panel, report view with highlights and a violations list.
+- Docker Compose (prod + dev), `.env.example`.
+
+---
+
+## Open items
+- Real-LLM E2E rerun on `gemini-3.5-flash` (needs product-owner OK, since it spends quota).
+- UI design: combined as glass panels on a slate/navy shell (ADR-012). Product owner to confirm.
+- PII data protection: masking is cosmetic (ADR-011). Decide on excerpt masking and document retention/encryption.
+- Multi-select input for array params (e.g. PII categories).
+=== TODO.md
+# Ruleguarder – work tracker
+
+Legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` needs you
+
+Branching: one feature branch per task, never commit directly to `dev` / `main`.
+
+| Branch | Based on | Status |
+|---|---|---|
+| `feature/project-scaffold` | `dev` | ✅ committed |
+| `feature/gemini-integration` | `feature/project-scaffold` | ✅ committed |
+| `feature/e2e-tests` | `feature/gemini-integration` | ✅ committed |
+| `fix/gemini-overload-fallback` | `feature/e2e-tests` | ✅ committed |
+| `feature/quality-gates` | `fix/gemini-overload-fallback` | ✅ committed |
+| `refactor/severity-levels` | `feature/quality-gates` | ✅ committed (+ spec for next two) |
+| `feature/rule-templates` | `refactor/severity-levels` | ✅ done, verified (154 tests) |
+| `feature/dashboard-ui` | `refactor/severity-levels` | ✅ done (subagent 2) |
+| `feature/templates-dashboard-integration` | both of the above | ✅ merged + verified (current branch) |
+
+## ✅ Phase 1 – Scaffold (`feature/project-scaffold`)
+- [x] Stack: FastAPI + python-docx + PostgreSQL + React/Vite/TS + Docker (nginx)
+- [x] DOCX parser: paragraphs, headings, tables, fonts, sizes, positions
+- [x] Rule engine: LLM rules + deterministic rules (forbidden/required text, length, fonts, sizes)
+- [x] LLM checker: chunking, parallel calls, quote → exact offsets
+- [x] API: rules CRUD, rule types, documents, check, stored reports
+- [x] Client: rules panel (schema-driven form), upload, document view with highlights, violations list
+- [x] docker-compose (prod + dev override), `.env.example`
+
+## ✅ Phase 2a – Gemini (`feature/gemini-integration`)
+- [x] Replace Anthropic SDK with `google-genai`
+- [x] Native structured output: `response_mime_type="application/json"` + Pydantic `response_schema`
+- [x] Retry with backoff on 429 / 5xx (free-tier quotas), clear errors for blocked / truncated answers
+- [x] `GEMINI_API_KEY` + `LLM_*` settings in `.env.example`
+- [x] Default model `gemini-3.8-flash` (1.5 models are no longer available) → changed to `gemini-3.5-flash` in `fix/gemini-overload-fallback`
+
+## ✅ Phase 2b – Tests (`feature/e2e-tests`)
+- [x] `tests` service in docker-compose (`docker compose --profile test run --rm tests`)
+- [x] Unit tests: parser, rules, LLM pipeline (fake provider), Gemini provider (mocked SDK)
+- [x] E2E: full flow through the running API with a generated sample .docx
+- [x] Fixed bug found by tests: table cells were dropped (merged-cell dedup used reused `id()`s)
+- [x] DB port no longer published in prod (clashed with a local Postgres); dev uses 5433
+- [x] Full stack verified: http://localhost:8080 → nginx → API → Postgres
+- [x] Real Gemini E2E passed (found 50 km, 3 m, 2 seconds) – but took 154 s due to 503s
+
+## ✅ Fix – Gemini overload & quota (`fix/gemini-overload-fallback`)
+- [x] Default `gemini-3.5-flash`; optional fallback models; 503/504/timeout → next model
+- [x] Only 429 retried, `LLM_MAX_RETRIES=1`, `LLM_MAX_PARALLEL=1`, `LLM_TIMEOUT_SECONDS=120`
+- [x] Real-LLM tests opt-in only (`pytest -m llm`); bounded request count unit-tested
+- [x] Project wiki created (`project_wiki/`)
+- [!] Rerun real-LLM E2E on `gemini-3.5-flash` – only with your OK (spends quota)
+
+## ✅ Quality gates (`feature/quality-gates`)
+- [x] Ruff + strict mypy (server), zero findings; `tests` image runs every gate
+- [x] ESLint 10 (0 warnings) + tsc + Vitest (client), 32 tests; logic extracted to lib/ and hooks/
+
+## ✅ Severity levels (`refactor/severity-levels`)
+- [x] error/warning/info → high/medium/low (API, DB, client, colours red/orange/yellow)
+- [x] Legacy values mapped on read; stored rules upgraded at startup (idempotent)
+- [x] Spec for rule templates + dashboard written to `project_wiki/API_CONTRACTS.md`
+
+## ✅ Phase 3 – Dashboard UI (`feature/dashboard-ui`, subagent 2)
+- [x] Tailwind v4; glass panels on slate/navy shell, dark pill buttons, focus rings, LTR, responsive
+- [x] Split screen: document (left, High red / Medium orange / Low yellow) · violations (right) with severity chips + rule filter
+- [x] Click violation → smooth scroll + 1.5 s flash + stays active; click highlight → selects card
+- [x] "Add from template" picker, "Load Sample Rules", "AI · uses quota" badge
+- [x] Vitest 86 tests; Playwright E2E (non-LLM rules only)
+
+## ✅ Phase 4 – Rule templates (`feature/rule-templates`, subagent 1) — done, verified by lead
+_6 commits; lead re-ran all gates on a fresh DB: ruff ✅ format ✅ mypy --strict ✅ **154 passed** (+96)._
+- [x] PII: email, credit card (Luhn + card prefix), SSN (US, dashed), phone (international / North American / national) – values masked in messages; negative tests for dates, versions, "50 km", IPs, ISBN…
+- [x] Acronyms: first use must be "Full Name (ABC)" or "ABC (Full Name)"; skips headings, Roman numerals, ALL-CAPS markings
+- [x] Cross-references: Section / Figure / Table incl. outline numbers computed from heading levels, captions, lists and ranges
+- [x] 11 templates (6 in the sample set); `GET /api/rules/templates`, `POST /api/rules/samples` (idempotent, AI sample disabled)
+- [!] Known limitations to review: part numbers like "0301-2345-678" read as phones; "API SDK" side by side skipped; "Chapter N" not checked
+
+## ✅ Integration (`feature/templates-dashboard-integration`, lead)
+- [x] Merged both branches; all gates on the integrated stack: server 154 ✅ · client 86 ✅ · Playwright 5 passed / 1 skipped (expected) ✅
+- [x] Fixed Playwright locator bug found in integration
+- [x] Reviewed screenshots; demo doc → 9 violations, correctly located
+- [x] Wiki: ADR-011/012/013, dev log, API contracts, prompt playbook; README
+- [x] Your app on :8080 updated to this version (your rules kept)
+
+## Decisions for you
+- [!] PII masking is cosmetic: full values stay in excerpts and stored documents (ADR-011). Mask excerpts? Retention/encryption for uploads?
+- [!] Confirm the design direction (glass panels on navy shell), or adjust
+- [!] Merge plan: these branches are stacked and not merged into `dev`. Open a PR / merge when you're ready
+- [!] Real-LLM E2E on `gemini-3.5-flash`: only with your OK (spends quota)
+
+## Later
+- [ ] Decide on data sensitivity: free-tier Gemini may use submitted content (see `.env.example`)
+- [ ] Evaluation set: documents with known violations → measure LLM recall, tune prompt
+- [ ] Background jobs with progress for long documents
+- [ ] Headers, footers, footnotes, text boxes, nested tables in the parser
+- [ ] Export report (DOCX with Word comments / PDF)
+- [ ] Mark a violation as false positive / accepted
+- [ ] Auth / users, Alembic migrations

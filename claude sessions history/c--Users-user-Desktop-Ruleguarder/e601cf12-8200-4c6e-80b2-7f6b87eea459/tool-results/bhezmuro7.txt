@@ -1,0 +1,951 @@
+     1	import type {
+     2	  DocumentFull,
+     3	  DocumentSummary,
+     4	  Report,
+     5	  Rule,
+     6	  RuleCreate,
+     7	  RuleTemplate,
+     8	  RuleType,
+     9	  RuleUpdate,
+    10	  SampleRulesResult,
+    11	} from "./types";
+    12	
+    13	const BASE = "/api";
+    14	
+    15	export class ApiError extends Error {
+    16	  constructor(
+    17	    public status: number,
+    18	    message: string,
+    19	  ) {
+    20	    super(message);
+    21	  }
+    22	}
+    23	
+    24	async function send(path: string, init?: RequestInit): Promise<Response> {
+    25	  const res = await fetch(BASE + path, init);
+    26	  if (!res.ok) {
+    27	    let message = res.statusText;
+    28	    try {
+    29	      const body = (await res.json()) as { detail?: unknown };
+    30	      message = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+    31	    } catch {
+    32	      /* non-JSON error body */
+    33	    }
+    34	    throw new ApiError(res.status, message);
+    35	  }
+    36	  return res;
+    37	}
+    38	
+    39	async function request<T>(path: string, init?: RequestInit): Promise<T> {
+    40	  const res = await send(path, init);
+    41	  return (await res.json()) as T;
+    42	}
+    43	
+    44	async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
+    45	  await send(path, init);
+    46	}
+    47	
+    48	const json = (method: string, body: unknown): RequestInit => ({
+    49	  method,
+    50	  headers: { "Content-Type": "application/json" },
+    51	  body: JSON.stringify(body),
+    52	});
+    53	
+    54	/**
+    55	 * True when the server doesn't provide an endpoint at all (older server build).
+    56	 * FastAPI answers 405 instead of 404 when the path matches another route's pattern
+    57	 * (e.g. `GET /rules/templates` vs `PATCH /rules/{id}`), so both mean "not available".
+    58	 */
+    59	export function isMissingEndpoint(err: unknown): boolean {
+    60	  return err instanceof ApiError && (err.status === 404 || err.status === 405);
+    61	}
+    62	
+    63	export const api = {
+    64	  ruleTypes: () => request<RuleType[]>("/rules/types"),
+    65	  rules: () => request<Rule[]>("/rules"),
+    66	  createRule: (rule: RuleCreate) => request<Rule>("/rules", json("POST", rule)),
+    67	  updateRule: (id: number, changes: RuleUpdate) => request<Rule>(`/rules/${id}`, json("PATCH", changes)),
+    68	  deleteRule: (id: number) => requestNoContent(`/rules/${id}`, { method: "DELETE" }),
+    69	  ruleTemplates: () => request<RuleTemplate[]>("/rules/templates"),
+    70	  loadSampleRules: () => request<SampleRulesResult>("/rules/samples", { method: "POST" }),
+    71	
+    72	  documents: () => request<DocumentSummary[]>("/documents"),
+    73	  document: (id: number) => request<DocumentFull>(`/documents/${id}`),
+    74	  uploadDocument: (file: File) => {
+    75	    const form = new FormData();
+    76	    form.append("file", file);
+    77	    return request<DocumentFull>("/documents", { method: "POST", body: form });
+    78	  },
+    79	  deleteDocument: (id: number) => requestNoContent(`/documents/${id}`, { method: "DELETE" }),
+    80	  check: (id: number) => request<Report>(`/documents/${id}/check`, json("POST", {})),
+    81	  latestReport: (id: number) => request<Report>(`/documents/${id}/report`),
+    82	};
+    83	import { StrictMode } from "react";
+    84	import { createRoot } from "react-dom/client";
+    85	import App from "./App";
+    86	import "./styles.css";
+    87	
+    88	const root = document.getElementById("root");
+    89	if (!root) throw new Error("Missing #root element");
+    90	
+    91	createRoot(root).render(
+    92	  <StrictMode>
+    93	    <App />
+    94	  </StrictMode>,
+    95	);
+    96	import { useMemo, useState } from "react";
+    97	import DocumentsPanel from "./components/DocumentsPanel";
+    98	import ReportView from "./components/ReportView";
+    99	import RulesPanel from "./components/RulesPanel";
+   100	import TopBar from "./components/TopBar";
+   101	import EmptyState from "./components/EmptyState";
+   102	import { ErrorNote, Panel } from "./components/ui";
+   103	import { useDocumentReport } from "./hooks/useDocumentReport";
+   104	import { useDocuments } from "./hooks/useDocuments";
+   105	import { useRules } from "./hooks/useRules";
+   106	import { useRuleTemplates } from "./hooks/useRuleTemplates";
+   107	import { countBySeverity } from "./lib/highlight";
+   108	import { usesAiQuota } from "./lib/templates";
+   109	import type { DocumentSummary } from "./types";
+   110	
+   111	/** Container: wires the data hooks to the presentation components. */
+   112	export default function App() {
+   113	  const rules = useRules();
+   114	  const templates = useRuleTemplates(rules.reload);
+   115	  const docs = useDocuments();
+   116	  const [selectedId, setSelectedId] = useState<number | null>(null);
+   117	  const report = useDocumentReport(selectedId);
+   118	
+   119	  const counts = useMemo(() => (report.violations ? countBySeverity(report.violations) : null), [report.violations]);
+   120	  const aiRulesEnabled = rules.rules.filter((r) => r.enabled && usesAiQuota(r)).length;
+   121	
+   122	  async function upload(file: File) {
+   123	    const doc = await docs.upload(file);
+   124	    if (doc) setSelectedId(doc.id);
+   125	  }
+   126	
+   127	  async function removeDocument(doc: DocumentSummary) {
+   128	    if ((await docs.remove(doc.id)) && doc.id === selectedId) setSelectedId(null);
+   129	  }
+   130	
+   131	  return (
+   132	    <div className="flex min-h-screen flex-col overflow-x-hidden bg-slate-950 lg:h-screen">
+   133	      <TopBar documentName={report.document?.filename ?? null} counts={counts} />
+   134	      <div className="grid flex-1 grid-cols-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[23rem_minmax(0,1fr)]">
+   135	        {/* On small screens the main area (upload / report) comes first */}
+   136	        <aside className="order-2 flex flex-col gap-4 lg:order-none lg:min-h-0 lg:overflow-y-auto" aria-label="Rules and documents">
+   137	          <RulesPanel
+   138	            rules={rules.rules}
+   139	            types={rules.types}
+   140	            loading={rules.loading}
+   141	            error={rules.error}
+   142	            onDismissError={rules.dismissError}
+   143	            onCreate={rules.createRule}
+   144	            onUpdate={rules.updateRule}
+   145	            onToggle={rules.toggleRule}
+   146	            onDelete={rules.deleteRule}
+   147	            templates={{
+   148	              templates: templates.templates,
+   149	              status: templates.status,
+   150	              error: templates.error,
+   151	              onRetry: templates.retry,
+   152	            }}
+   153	            samples={{ ...templates.samples, onLoad: templates.loadSamples, onDismiss: templates.dismissSamples }}
+   154	          />
+   155	          <DocumentsPanel
+   156	            documents={docs.documents}
+   157	            selectedId={selectedId}
+   158	            loading={docs.loading}
+   159	            uploading={docs.uploading}
+   160	            error={docs.error}
+   161	            onSelect={setSelectedId}
+   162	            onUpload={upload}
+   163	            onDelete={removeDocument}
+   164	          />
+   165	        </aside>
+   166	
+   167	        <main className="order-1 flex min-w-0 flex-col gap-4 lg:order-none lg:min-h-0">
+   168	          {report.error && <ErrorNote>{report.error}</ErrorNote>}
+   169	          {report.document ? (
+   170	            <ReportView
+   171	              key={`${report.document.id}-${report.checkedAt ?? "unchecked"}`}
+   172	              document={report.document}
+   173	              violations={report.violations}
+   174	              checking={report.checking}
+   175	              checkedAt={report.checkedAt}
+   176	              aiRulesEnabled={aiRulesEnabled}
+   177	              onCheck={report.runCheck}
+   178	            />
+   179	          ) : (
+   180	            report.loading ? (
+   181	              <Panel className="flex flex-1 items-center justify-center p-8">
+   182	                <p role="status" className="text-sm text-slate-400">
+   183	                  Loading document…
+   184	                </p>
+   185	              </Panel>
+   186	            ) : (
+   187	              <EmptyState
+   188	                documents={docs.documents}
+   189	                rulesEnabled={rules.rules.filter((r) => r.enabled).length}
+   190	                uploading={docs.uploading}
+   191	                onUpload={upload}
+   192	                onSelect={setSelectedId}
+   193	              />
+   194	            )
+   195	          )}
+   196	        </main>
+   197	      </div>
+   198	    </div>
+   199	  );
+   200	}
+   201	/** Human-readable message for any thrown value; network failures get a clear explanation. */
+   202	export function errorMessage(err: unknown): string {
+   203	  if (err instanceof TypeError && /fetch|network/i.test(err.message)) {
+   204	    return "Network error: the server could not be reached. Check your connection and try again.";
+   205	  }
+   206	  return err instanceof Error ? err.message : String(err);
+   207	}
+   208	export const DOCX_ACCEPT = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+   209	
+   210	/** Human-readable file size: KB below 1 MB, one decimal in MB above. */
+   211	export function formatSize(bytes: number): string {
+   212	  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+   213	}
+   214	import type { RuleCreate, RuleTemplate, RuleTemplateCategory, SampleRulesResult } from "../types";
+   215	
+   216	export const CATEGORY_LABEL: Record<RuleTemplateCategory, string> = {
+   217	  security: "Security",
+   218	  privacy: "Privacy",
+   219	  style: "Style",
+   220	  structure: "Structure",
+   221	  ai: "AI",
+   222	};
+   223	
+   224	const CATEGORY_ORDER: readonly RuleTemplateCategory[] = ["security", "privacy", "style", "structure", "ai"];
+   225	
+   226	export interface TemplateGroup {
+   227	  category: RuleTemplateCategory | "other";
+   228	  label: string;
+   229	  templates: RuleTemplate[];
+   230	}
+   231	
+   232	/** Templates grouped by category in a fixed order; empty groups are dropped. Unknown categories go last. */
+   233	export function groupTemplates(templates: readonly RuleTemplate[]): TemplateGroup[] {
+   234	  const groups: TemplateGroup[] = CATEGORY_ORDER.map((category) => ({
+   235	    category,
+   236	    label: CATEGORY_LABEL[category],
+   237	    templates: templates.filter((t) => t.category === category),
+   238	  }));
+   239	  groups.push({ category: "other", label: "Other", templates: templates.filter((t) => !CATEGORY_ORDER.includes(t.category)) });
+   240	  return groups.filter((g) => g.templates.length > 0);
+   241	}
+   242	
+   243	/** A copy of the template's rule to prefill the new-rule form (the template itself is never mutated). */
+   244	export function draftFromTemplate(template: RuleTemplate): RuleCreate {
+   245	  const { rule } = template;
+   246	  return { ...rule, params: structuredClone(rule.params) };
+   247	}
+   248	
+   249	export function sampleResultMessage(result: SampleRulesResult): string {
+   250	  return `${result.created.length} added, ${result.skipped.length} already present`;
+   251	}
+   252	
+   253	/** Rules of this type are checked by the LLM and spend AI quota. */
+   254	export const LLM_RULE_TYPE = "llm";
+   255	
+   256	export function usesAiQuota(rule: { type: string }): boolean {
+   257	  return rule.type === LLM_RULE_TYPE;
+   258	}
+   259	import type { RuleType } from "../types";
+   260	
+   261	/** Initial form values for a rule type's params: the schema default, else an empty value of the right kind. */
+   262	export function defaultParams(type: RuleType | undefined): Record<string, unknown> {
+   263	  const out: Record<string, unknown> = {};
+   264	  for (const [name, schema] of Object.entries(type?.params_schema.properties ?? {})) {
+   265	    out[name] = schema.default ?? (schema.type === "boolean" ? false : schema.type === "array" ? [] : "");
+   266	  }
+   267	  return out;
+   268	}
+   269	import { act, renderHook, waitFor } from "@testing-library/react";
+   270	import { afterEach, describe, expect, it, vi } from "vitest";
+   271	import { api, ApiError } from "../api";
+   272	import { DOC, report, violation } from "../test/fixtures";
+   273	import { useDocumentReport } from "./useDocumentReport";
+   274	
+   275	afterEach(() => {
+   276	  vi.restoreAllMocks();
+   277	});
+   278	
+   279	describe("useDocumentReport", () => {
+   280	  it("does nothing without a selection", () => {
+   281	    const spy = vi.spyOn(api, "latestReport");
+   282	    const { result } = renderHook(() => useDocumentReport(null));
+   283	    expect(result.current.document).toBeNull();
+   284	    expect(spy).not.toHaveBeenCalled();
+   285	  });
+   286	
+   287	  it("loads the latest report", async () => {
+   288	    const v = violation({ id: "1-0", block_id: 1, start: 23, end: 28 });
+   289	    vi.spyOn(api, "latestReport").mockResolvedValue(report([v]));
+   290	    const { result } = renderHook(() => useDocumentReport(1));
+   291	    expect(result.current.loading).toBe(true);
+   292	    await waitFor(() => expect(result.current.document).toEqual(DOC));
+   293	    expect(result.current.violations).toEqual([v]);
+   294	    expect(result.current.loading).toBe(false);
+   295	  });
+   296	
+   297	  it("falls back to the bare document when it was never checked", async () => {
+   298	    vi.spyOn(api, "latestReport").mockRejectedValue(new ApiError(404, "not checked"));
+   299	    vi.spyOn(api, "document").mockResolvedValue(DOC);
+   300	    const { result } = renderHook(() => useDocumentReport(1));
+   301	    await waitFor(() => expect(result.current.document).toEqual(DOC));
+   302	    expect(result.current.violations).toBeNull();
+   303	    expect(result.current.error).toBeNull();
+   304	  });
+   305	
+   306	  it("reports other load errors", async () => {
+   307	    vi.spyOn(api, "latestReport").mockRejectedValue(new ApiError(500, "boom"));
+   308	    const { result } = renderHook(() => useDocumentReport(1));
+   309	    await waitFor(() => expect(result.current.error).toBe("boom"));
+   310	  });
+   311	
+   312	  it("runs a check and keeps the document when the check fails", async () => {
+   313	    vi.spyOn(api, "latestReport").mockRejectedValue(new ApiError(404, "not checked"));
+   314	    vi.spyOn(api, "document").mockResolvedValue(DOC);
+   315	    const check = vi.spyOn(api, "check").mockRejectedValueOnce(new ApiError(502, "All Gemini models are unavailable"));
+   316	    const { result } = renderHook(() => useDocumentReport(1));
+   317	    await waitFor(() => expect(result.current.document).toEqual(DOC));
+   318	
+   319	    await act(() => result.current.runCheck());
+   320	    expect(result.current.error).toMatch(/unavailable/);
+   321	    expect(result.current.document).toEqual(DOC);
+   322	    expect(result.current.checking).toBe(false);
+   323	
+   324	    check.mockResolvedValueOnce(report([]));
+   325	    await act(() => result.current.runCheck());
+   326	    expect(result.current.violations).toEqual([]);
+   327	    expect(result.current.error).toBeNull();
+   328	  });
+   329	
+   330	  it("resets when the selection changes", async () => {
+   331	    vi.spyOn(api, "latestReport").mockResolvedValue(report([]));
+   332	    const { result, rerender } = renderHook(({ id }) => useDocumentReport(id), { initialProps: { id: 1 as number | null } });
+   333	    await waitFor(() => expect(result.current.document).not.toBeNull());
+   334	    rerender({ id: null });
+   335	    expect(result.current.document).toBeNull();
+   336	  });
+   337	});
+   338	import { useCallback, useEffect, useState } from "react";
+   339	import { api, ApiError } from "../api";
+   340	import { errorMessage } from "../lib/errors";
+   341	import type { DocumentFull, Violation } from "../types";
+   342	
+   343	export interface DocumentReportState {
+   344	  document: DocumentFull | null;
+   345	  /** null => document not checked yet */
+   346	  violations: Violation[] | null;
+   347	  checkedAt: string | null;
+   348	  loading: boolean;
+   349	  checking: boolean;
+   350	  error: string | null;
+   351	}
+   352	
+   353	const EMPTY: DocumentReportState = {
+   354	  document: null,
+   355	  violations: null,
+   356	  checkedAt: null,
+   357	  loading: false,
+   358	  checking: false,
+   359	  error: null,
+   360	};
+   361	
+   362	/** Loads the latest report for a document (or the bare document if never checked) and runs checks. */
+   363	export function useDocumentReport(documentId: number | null) {
+   364	  const [state, setState] = useState<DocumentReportState>(EMPTY);
+   365	  const [loadedId, setLoadedId] = useState<number | null>(null);
+   366	
+   367	  // Reset during render when the selection changes (avoids setState inside an effect)
+   368	  if (loadedId !== documentId) {
+   369	    setLoadedId(documentId);
+   370	    setState({ ...EMPTY, loading: documentId !== null });
+   371	  }
+   372	
+   373	  useEffect(() => {
+   374	    if (documentId === null) return;
+   375	    let cancelled = false;
+   376	    load(documentId)
+   377	      .then((next) => !cancelled && setState({ ...EMPTY, ...next }))
+   378	      .catch((err: unknown) => !cancelled && setState({ ...EMPTY, error: errorMessage(err) }));
+   379	    return () => {
+   380	      cancelled = true;
+   381	    };
+   382	  }, [documentId]);
+   383	
+   384	  const runCheck = useCallback(async () => {
+   385	    if (documentId === null) return;
+   386	    setState((s) => ({ ...s, checking: true, error: null }));
+   387	    try {
+   388	      const report = await api.check(documentId);
+   389	      setState({
+   390	        ...EMPTY,
+   391	        document: report.document,
+   392	        violations: report.violations,
+   393	        checkedAt: report.checked_at,
+   394	      });
+   395	    } catch (err) {
+   396	      setState((s) => ({ ...s, checking: false, error: errorMessage(err) }));
+   397	    }
+   398	  }, [documentId]);
+   399	
+   400	  return { ...state, runCheck };
+   401	}
+   402	
+   403	async function load(documentId: number): Promise<Partial<DocumentReportState>> {
+   404	  try {
+   405	    const report = await api.latestReport(documentId);
+   406	    return { document: report.document, violations: report.violations, checkedAt: report.checked_at };
+   407	  } catch (err) {
+   408	    if (!(err instanceof ApiError && err.status === 404)) throw err;
+   409	    return { document: await api.document(documentId) };
+   410	  }
+   411	}
+   412	import { act, renderHook, waitFor } from "@testing-library/react";
+   413	import { afterEach, describe, expect, it, vi } from "vitest";
+   414	import { api, ApiError } from "../api";
+   415	import { DOC, summary } from "../test/fixtures";
+   416	import { useDocuments } from "./useDocuments";
+   417	
+   418	afterEach(() => {
+   419	  vi.restoreAllMocks();
+   420	});
+   421	
+   422	async function loaded() {
+   423	  const hook = renderHook(() => useDocuments());
+   424	  await waitFor(() => expect(hook.result.current.loading).toBe(false));
+   425	  return hook;
+   426	}
+   427	
+   428	const file = () => new File(["x"], "spec.docx");
+   429	
+   430	describe("useDocuments", () => {
+   431	  it("lists documents", async () => {
+   432	    vi.spyOn(api, "documents").mockResolvedValue([summary(1), summary(2)]);
+   433	    const { result } = await loaded();
+   434	    expect(result.current.documents.map((d) => d.id)).toEqual([1, 2]);
+   435	  });
+   436	
+   437	  it("uploads, refreshes and returns the new document", async () => {
+   438	    const list = vi.spyOn(api, "documents").mockResolvedValue([]);
+   439	    vi.spyOn(api, "uploadDocument").mockResolvedValue(DOC);
+   440	    const { result } = await loaded();
+   441	    list.mockResolvedValue([summary(1, "spec.docx")]);
+   442	
+   443	    let uploaded: unknown;
+   444	    await act(async () => {
+   445	      uploaded = await result.current.upload(file());
+   446	    });
+   447	    expect(uploaded).toEqual(DOC);
+   448	    expect(result.current.documents).toHaveLength(1);
+   449	    expect(result.current.uploading).toBe(false);
+   450	  });
+   451	
+   452	  it("reports an upload error (e.g. not a .docx) and returns null", async () => {
+   453	    vi.spyOn(api, "documents").mockResolvedValue([]);
+   454	    vi.spyOn(api, "uploadDocument").mockRejectedValue(new ApiError(400, "Only .docx files are supported"));
+   455	    const { result } = await loaded();
+   456	    let uploaded: unknown;
+   457	    await act(async () => {
+   458	      uploaded = await result.current.upload(file());
+   459	    });
+   460	    expect(uploaded).toBeNull();
+   461	    expect(result.current.error).toBe("Only .docx files are supported");
+   462	  });
+   463	
+   464	  it("deletes a document, and reports a network failure", async () => {
+   465	    vi.spyOn(api, "documents").mockResolvedValue([summary(1)]);
+   466	    const del = vi.spyOn(api, "deleteDocument").mockResolvedValue(undefined);
+   467	    const { result } = await loaded();
+   468	
+   469	    let ok: unknown;
+   470	    await act(async () => {
+   471	      ok = await result.current.remove(1);
+   472	    });
+   473	    expect(ok).toBe(true);
+   474	    expect(del).toHaveBeenCalledWith(1);
+   475	
+   476	    del.mockRejectedValue(new TypeError("Failed to fetch"));
+   477	    await act(async () => {
+   478	      ok = await result.current.remove(1);
+   479	    });
+   480	    expect(ok).toBe(false);
+   481	    expect(result.current.error).toMatch(/^Network error/);
+   482	  });
+   483	});
+   484	import { useCallback, useEffect, useState } from "react";
+   485	import { api } from "../api";
+   486	import { errorMessage } from "../lib/errors";
+   487	import type { DocumentFull, DocumentSummary } from "../types";
+   488	
+   489	export interface DocumentsState {
+   490	  documents: DocumentSummary[];
+   491	  loading: boolean;
+   492	  uploading: boolean;
+   493	  error: string | null;
+   494	}
+   495	
+   496	/** Uploaded documents: list, upload and delete. Failures are reported through `error`. */
+   497	export function useDocuments() {
+   498	  const [state, setState] = useState<DocumentsState>({ documents: [], loading: true, uploading: false, error: null });
+   499	
+   500	  useEffect(() => {
+   501	    let cancelled = false;
+   502	    api
+   503	      .documents()
+   504	      .then((documents) => !cancelled && setState((s) => ({ ...s, documents, loading: false })))
+   505	      .catch((err: unknown) => !cancelled && setState((s) => ({ ...s, loading: false, error: errorMessage(err) })));
+   506	    return () => {
+   507	      cancelled = true;
+   508	    };
+   509	  }, []);
+   510	
+   511	  const reload = useCallback(async () => {
+   512	    try {
+   513	      const documents = await api.documents();
+   514	      setState((s) => ({ ...s, documents, error: null }));
+   515	    } catch (err) {
+   516	      setState((s) => ({ ...s, error: errorMessage(err) }));
+   517	    }
+   518	  }, []);
+   519	
+   520	  /** Resolves to the uploaded document, or null when the upload failed. */
+   521	  const upload = useCallback(
+   522	    async (file: File): Promise<DocumentFull | null> => {
+   523	      setState((s) => ({ ...s, uploading: true, error: null }));
+   524	      try {
+   525	        const doc = await api.uploadDocument(file);
+   526	        setState((s) => ({ ...s, uploading: false }));
+   527	        await reload();
+   528	        return doc;
+   529	      } catch (err) {
+   530	        setState((s) => ({ ...s, uploading: false, error: errorMessage(err) }));
+   531	        return null;
+   532	      }
+   533	    },
+   534	    [reload],
+   535	  );
+   536	
+   537	  /** Resolves to true when the document was deleted. */
+   538	  const remove = useCallback(
+   539	    async (id: number): Promise<boolean> => {
+   540	      try {
+   541	        await api.deleteDocument(id);
+   542	        await reload();
+   543	        return true;
+   544	      } catch (err) {
+   545	        setState((s) => ({ ...s, error: errorMessage(err) }));
+   546	        return false;
+   547	      }
+   548	    },
+   549	    [reload],
+   550	  );
+   551	
+   552	  return { ...state, reload, upload, remove };
+   553	}
+   554	import { act, renderHook, waitFor } from "@testing-library/react";
+   555	import { afterEach, describe, expect, it, vi } from "vitest";
+   556	import { api, ApiError } from "../api";
+   557	import { rule, template } from "../test/fixtures";
+   558	import { SAMPLES_UNAVAILABLE, useRuleTemplates } from "./useRuleTemplates";
+   559	
+   560	afterEach(() => {
+   561	  vi.restoreAllMocks();
+   562	});
+   563	
+   564	describe("useRuleTemplates", () => {
+   565	  it("loads the templates", async () => {
+   566	    const templates = [template({ id: "pii-all" })];
+   567	    vi.spyOn(api, "ruleTemplates").mockResolvedValue(templates);
+   568	    const { result } = renderHook(() => useRuleTemplates(vi.fn()));
+   569	    expect(result.current.status).toBe("loading");
+   570	    await waitFor(() => expect(result.current.status).toBe("ready"));
+   571	    expect(result.current.templates).toEqual(templates);
+   572	  });
+   573	
+   574	  it.each([404, 405])("marks templates unavailable when the endpoint is missing (%i)", async (status) => {
+   575	    vi.spyOn(api, "ruleTemplates").mockRejectedValue(new ApiError(status, "Not Found"));
+   576	    const { result } = renderHook(() => useRuleTemplates(vi.fn()));
+   577	    await waitFor(() => expect(result.current.status).toBe("unavailable"));
+   578	    expect(result.current.error).toBeNull();
+   579	    expect(result.current.templates).toEqual([]);
+   580	  });
+   581	
+   582	  it("reports a network failure and can retry", async () => {
+   583	    const spy = vi.spyOn(api, "ruleTemplates").mockRejectedValueOnce(new TypeError("Failed to fetch"));
+   584	    const { result } = renderHook(() => useRuleTemplates(vi.fn()));
+   585	    await waitFor(() => expect(result.current.status).toBe("error"));
+   586	    expect(result.current.error).toMatch(/^Network error/);
+   587	
+   588	    spy.mockResolvedValueOnce([template({ id: "x" })]);
+   589	    act(() => result.current.retry());
+   590	    expect(result.current.status).toBe("loading");
+   591	    await waitFor(() => expect(result.current.status).toBe("ready"));
+   592	    expect(spy).toHaveBeenCalledTimes(2);
+   593	  });
+   594	
+   595	  it("loads the sample rules, reports the counts and refreshes the rules", async () => {
+   596	    vi.spyOn(api, "ruleTemplates").mockResolvedValue([]);
+   597	    vi.spyOn(api, "loadSampleRules").mockResolvedValue({
+   598	      created: [rule({ id: 1 }), rule({ id: 2 }), rule({ id: 3 })],
+   599	      skipped: ["PII", "Acronyms"],
+   600	    });
+   601	    const onRulesChanged = vi.fn();
+   602	    const { result } = renderHook(() => useRuleTemplates(onRulesChanged));
+   603	
+   604	    await act(() => result.current.loadSamples());
+   605	    expect(result.current.samples).toEqual({ loading: false, message: "3 added, 2 already present", error: null });
+   606	    expect(onRulesChanged).toHaveBeenCalledOnce();
+   607	
+   608	    act(() => result.current.dismissSamples());
+   609	    expect(result.current.samples.message).toBeNull();
+   610	  });
+   611	
+   612	  it("explains a missing samples endpoint and does not refresh", async () => {
+   613	    vi.spyOn(api, "ruleTemplates").mockResolvedValue([]);
+   614	    vi.spyOn(api, "loadSampleRules").mockRejectedValue(new ApiError(404, "Not Found"));
+   615	    const onRulesChanged = vi.fn();
+   616	    const { result } = renderHook(() => useRuleTemplates(onRulesChanged));
+   617	    await act(() => result.current.loadSamples());
+   618	    expect(result.current.samples.error).toBe(SAMPLES_UNAVAILABLE);
+   619	    expect(onRulesChanged).not.toHaveBeenCalled();
+   620	  });
+   621	
+   622	  it("reports other sample-load failures", async () => {
+   623	    vi.spyOn(api, "ruleTemplates").mockResolvedValue([]);
+   624	    vi.spyOn(api, "loadSampleRules").mockRejectedValue(new TypeError("Failed to fetch"));
+   625	    const { result } = renderHook(() => useRuleTemplates(vi.fn()));
+   626	    await act(() => result.current.loadSamples());
+   627	    expect(result.current.samples.error).toMatch(/^Network error/);
+   628	    expect(result.current.samples.loading).toBe(false);
+   629	  });
+   630	});
+   631	import { useCallback, useEffect, useState } from "react";
+   632	import { api, isMissingEndpoint } from "../api";
+   633	import { errorMessage } from "../lib/errors";
+   634	import { sampleResultMessage } from "../lib/templates";
+   635	import type { RuleTemplate } from "../types";
+   636	
+   637	/** `unavailable` => this server has no template endpoints (404/405); the UI hides the template features. */
+   638	export type TemplatesStatus = "loading" | "ready" | "unavailable" | "error";
+   639	
+   640	export interface TemplatesState {
+   641	  templates: RuleTemplate[];
+   642	  status: TemplatesStatus;
+   643	  error: string | null;
+   644	}
+   645	
+   646	export interface SamplesState {
+   647	  loading: boolean;
+   648	  /** e.g. "3 added, 2 already present" */
+   649	  message: string | null;
+   650	  error: string | null;
+   651	}
+   652	
+   653	export const SAMPLES_UNAVAILABLE = "Sample rules are not available on this server.";
+   654	
+   655	/**
+   656	 * Rule templates (`GET /api/rules/templates`) and the sample set (`POST /api/rules/samples`).
+   657	 * `onRulesChanged` is called after samples were loaded so the rules list refreshes.
+   658	 */
+   659	export function useRuleTemplates(onRulesChanged: () => unknown) {
+   660	  const [state, setState] = useState<TemplatesState>({ templates: [], status: "loading", error: null });
+   661	  const [samples, setSamples] = useState<SamplesState>({ loading: false, message: null, error: null });
+   662	  const [attempt, setAttempt] = useState(0);
+   663	
+   664	  useEffect(() => {
+   665	    let cancelled = false;
+   666	    api
+   667	      .ruleTemplates()
+   668	      .then((templates) => !cancelled && setState({ templates, status: "ready", error: null }))
+   669	      .catch((err: unknown) => {
+   670	        if (cancelled) return;
+   671	        setState(
+   672	          isMissingEndpoint(err)
+   673	            ? { templates: [], status: "unavailable", error: null }
+   674	            : { templates: [], status: "error", error: errorMessage(err) },
+   675	        );
+   676	      });
+   677	    return () => {
+   678	      cancelled = true;
+   679	    };
+   680	  }, [attempt]);
+   681	
+   682	  const retry = useCallback(() => {
+   683	    setState((s) => ({ ...s, status: "loading", error: null }));
+   684	    setAttempt((n) => n + 1);
+   685	  }, []);
+   686	
+   687	  const loadSamples = useCallback(async () => {
+   688	    setSamples({ loading: true, message: null, error: null });
+   689	    try {
+   690	      const result = await api.loadSampleRules();
+   691	      setSamples({ loading: false, message: sampleResultMessage(result), error: null });
+   692	      await onRulesChanged();
+   693	    } catch (err) {
+   694	      setSamples({
+   695	        loading: false,
+   696	        message: null,
+   697	        error: isMissingEndpoint(err) ? SAMPLES_UNAVAILABLE : errorMessage(err),
+   698	      });
+   699	    }
+   700	  }, [onRulesChanged]);
+   701	
+   702	  const dismissSamples = useCallback(() => setSamples({ loading: false, message: null, error: null }), []);
+   703	
+   704	  return { ...state, retry, samples, loadSamples, dismissSamples };
+   705	}
+   706	import { act, renderHook, waitFor } from "@testing-library/react";
+   707	import { afterEach, describe, expect, it, vi } from "vitest";
+   708	import { api, ApiError } from "../api";
+   709	import { rule, RULE_TYPES } from "../test/fixtures";
+   710	import { useRules } from "./useRules";
+   711	
+   712	afterEach(() => {
+   713	  vi.restoreAllMocks();
+   714	});
+   715	
+   716	async function loaded() {
+   717	  const hook = renderHook(() => useRules());
+   718	  await waitFor(() => expect(hook.result.current.loading).toBe(false));
+   719	  return hook;
+   720	}
+   721	
+   722	describe("useRules", () => {
+   723	  it("loads rules and rule types", async () => {
+   724	    vi.spyOn(api, "rules").mockResolvedValue([rule({ id: 1 })]);
+   725	    vi.spyOn(api, "ruleTypes").mockResolvedValue(RULE_TYPES);
+   726	    const { result } = await loaded();
+   727	    expect(result.current.rules).toHaveLength(1);
+   728	    expect(result.current.types).toEqual(RULE_TYPES);
+   729	    expect(result.current.error).toBeNull();
+   730	  });
+   731	
+   732	  it("reports a network failure while loading", async () => {
+   733	    vi.spyOn(api, "rules").mockRejectedValue(new TypeError("Failed to fetch"));
+   734	    vi.spyOn(api, "ruleTypes").mockResolvedValue(RULE_TYPES);
+   735	    const { result } = await loaded();
+   736	    expect(result.current.error).toMatch(/^Network error/);
+   737	  });
+   738	
+   739	  it("creates a rule and refreshes; validation errors are re-thrown to the form", async () => {
+   740	    const rules = vi.spyOn(api, "rules").mockResolvedValue([]);
+   741	    vi.spyOn(api, "ruleTypes").mockResolvedValue(RULE_TYPES);
+   742	    const create = vi.spyOn(api, "createRule").mockResolvedValue(rule({ id: 5 }));
+   743	    const { result } = await loaded();
+   744	
+   745	    rules.mockResolvedValue([rule({ id: 5 })]);
+   746	    await act(() => result.current.createRule({ name: "R", type: "forbidden_text", params: { pattern: "x" } }));
+   747	    expect(create).toHaveBeenCalledOnce();
+   748	    expect(result.current.rules.map((r) => r.id)).toEqual([5]);
+   749	
+   750	    create.mockRejectedValue(new ApiError(422, "Invalid regular expression"));
+   751	    await expect(result.current.createRule({ name: "R", type: "forbidden_text", params: {} })).rejects.toThrow(
+   752	      "Invalid regular expression",
+   753	    );
+   754	  });
+   755	
+   756	  it("toggles and deletes, reporting failures through error", async () => {
+   757	    const r = rule({ id: 2, enabled: true });
+   758	    vi.spyOn(api, "rules").mockResolvedValue([r]);
+   759	    vi.spyOn(api, "ruleTypes").mockResolvedValue(RULE_TYPES);
+   760	    const update = vi.spyOn(api, "updateRule").mockResolvedValue({ ...r, enabled: false });
+   761	    const del = vi.spyOn(api, "deleteRule").mockRejectedValue(new ApiError(404, "Rule not found"));
+   762	    const { result } = await loaded();
+   763	
+   764	    await act(() => result.current.toggleRule(r));
+   765	    expect(update).toHaveBeenCalledWith(2, { enabled: false });
+   766	
+   767	    await act(() => result.current.deleteRule(r));
+   768	    expect(del).toHaveBeenCalledWith(2);
+   769	    expect(result.current.error).toBe("Rule not found");
+   770	    act(() => result.current.dismissError());
+   771	    expect(result.current.error).toBeNull();
+   772	  });
+   773	});
+   774	import { useCallback, useEffect, useState } from "react";
+   775	import { api } from "../api";
+   776	import { errorMessage } from "../lib/errors";
+   777	import type { Rule, RuleCreate, RuleType, RuleUpdate } from "../types";
+   778	
+   779	export interface RulesState {
+   780	  rules: Rule[];
+   781	  types: RuleType[];
+   782	  loading: boolean;
+   783	  error: string | null;
+   784	}
+   785	
+   786	/**
+   787	 * Rules and rule types, plus CRUD. `createRule` / `updateRule` re-throw so a form can show
+   788	 * the server's validation message; toggle and delete report failures through `error`.
+   789	 */
+   790	export function useRules() {
+   791	  const [state, setState] = useState<RulesState>({ rules: [], types: [], loading: true, error: null });
+   792	
+   793	  useEffect(() => {
+   794	    let cancelled = false;
+   795	    Promise.all([api.rules(), api.ruleTypes()])
+   796	      .then(([rules, types]) => !cancelled && setState({ rules, types, loading: false, error: null }))
+   797	      .catch((err: unknown) => !cancelled && setState((s) => ({ ...s, loading: false, error: errorMessage(err) })));
+   798	    return () => {
+   799	      cancelled = true;
+   800	    };
+   801	  }, []);
+   802	
+   803	  const reload = useCallback(async () => {
+   804	    try {
+   805	      const rules = await api.rules();
+   806	      setState((s) => ({ ...s, rules, error: null }));
+   807	    } catch (err) {
+   808	      setState((s) => ({ ...s, error: errorMessage(err) }));
+   809	    }
+   810	  }, []);
+   811	
+   812	  const createRule = useCallback(
+   813	    async (input: RuleCreate) => {
+   814	      await api.createRule(input);
+   815	      await reload();
+   816	    },
+   817	    [reload],
+   818	  );
+   819	
+   820	  const updateRule = useCallback(
+   821	    async (id: number, changes: RuleUpdate) => {
+   822	      await api.updateRule(id, changes);
+   823	      await reload();
+   824	    },
+   825	    [reload],
+   826	  );
+   827	
+   828	  const guarded = useCallback(
+   829	    async (action: () => Promise<unknown>) => {
+   830	      try {
+   831	        await action();
+   832	        await reload();
+   833	      } catch (err) {
+   834	        setState((s) => ({ ...s, error: errorMessage(err) }));
+   835	      }
+   836	    },
+   837	    [reload],
+   838	  );
+   839	
+   840	  const toggleRule = useCallback(
+   841	    (rule: Rule) => guarded(() => api.updateRule(rule.id, { enabled: !rule.enabled })),
+   842	    [guarded],
+   843	  );
+   844	  const deleteRule = useCallback((rule: Rule) => guarded(() => api.deleteRule(rule.id)), [guarded]);
+   845	  const dismissError = useCallback(() => setState((s) => ({ ...s, error: null })), []);
+   846	
+   847	  return { ...state, reload, createRule, updateRule, toggleRule, deleteRule, dismissError };
+   848	}
+   849	import { useCallback, useMemo, useState } from "react";
+   850	import { countBySeverity } from "../lib/highlight";
+   851	import {
+   852	  ALL_SEVERITIES,
+   853	  documentLevelFirst,
+   854	  filterViolations,
+   855	  ruleOptions,
+   856	  toggleSeverity as toggle,
+   857	} from "../lib/violations";
+   858	import type { Severity, Violation } from "../types";
+   859	
+   860	/**
+   861	 * Severity chips + rule filter over a report's violations.
+   862	 * Chip counts reflect the rule filter, so they always match what a chip would show.
+   863	 * Reset by giving the owning component a new `key` per report.
+   864	 */
+   865	export function useViolationFilters(violations: readonly Violation[]) {
+   866	  const [severities, setSeverities] = useState<ReadonlySet<Severity>>(ALL_SEVERITIES);
+   867	  const [ruleId, setRuleId] = useState<number | null>(null);
+   868	
+   869	  const rules = useMemo(() => ruleOptions(violations), [violations]);
+   870	  // A stale rule filter (rule no longer in this report) behaves like "all rules"
+   871	  const effectiveRuleId = ruleId !== null && rules.some((r) => r.ruleId === ruleId) ? ruleId : null;
+   872	
+   873	  const counts = useMemo(
+   874	    () => countBySeverity(filterViolations(violations, { severities: ALL_SEVERITIES, ruleId: effectiveRuleId })),
+   875	    [violations, effectiveRuleId],
+   876	  );
+   877	  const visible = useMemo(
+   878	    () => documentLevelFirst(filterViolations(violations, { severities, ruleId: effectiveRuleId })),
+   879	    [violations, severities, effectiveRuleId],
+   880	  );
+   881	
+   882	  const toggleSeverity = useCallback((s: Severity) => setSeverities((current) => toggle(current, s)), []);
+   883	  const clear = useCallback(() => {
+   884	    setSeverities(ALL_SEVERITIES);
+   885	    setRuleId(null);
+   886	  }, []);
+   887	
+   888	  const isFiltered = effectiveRuleId !== null || severities.size !== ALL_SEVERITIES.size;
+   889	
+   890	  return { severities, toggleSeverity, ruleId: effectiveRuleId, setRuleId, rules, counts, visible, isFiltered, clear };
+   891	}
+   892	import { useCallback, useEffect, useRef, useState } from "react";
+   893	import { FLASH_MS, scrollBehavior } from "../lib/motion";
+   894	import type { Violation } from "../types";
+   895	
+   896	export interface Flash {
+   897	  blockId: number;
+   898	  /** Changes on every click, so a keyed overlay remounts and the CSS animation restarts. */
+   899	  nonce: number;
+   900	}
+   901	
+   902	/**
+   903	 * The selected ("active") violation and the paragraph flash.
+   904	 * - From the list: scroll the paragraph into view (smooth), mark it active and flash it for FLASH_MS.
+   905	 * - From the document (clicking a highlight): mark it active and scroll its card into view in the list.
+   906	 * Document-level violations (block_id null) only become active.
+   907	 */
+   908	export function useViolationFocus() {
+   909	  const [activeId, setActiveId] = useState<string | null>(null);
+   910	  const [flash, setFlash] = useState<Flash | null>(null);
+   911	  const blocks = useRef(new Map<number, HTMLElement>());
+   912	  const items = useRef(new Map<string, HTMLElement>());
+   913	  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+   914	  const nonce = useRef(0);
+   915	
+   916	  useEffect(() => () => clearTimeout(timer.current), []);
+   917	
+   918	  const selectFromList = useCallback((v: Violation) => {
+   919	    setActiveId(v.id);
+   920	    if (v.block_id === null) return;
+   921	    const blockId = v.block_id;
+   922	    blocks.current.get(blockId)?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+   923	    nonce.current += 1;
+   924	    setFlash({ blockId, nonce: nonce.current });
+   925	    clearTimeout(timer.current);
+   926	    timer.current = setTimeout(() => setFlash(null), FLASH_MS);
+   927	  }, []);
+   928	
+   929	  const selectFromDocument = useCallback((v: Violation) => {
+   930	    setActiveId(v.id);
+   931	    items.current.get(v.id)?.scrollIntoView({ behavior: scrollBehavior(), block: "nearest" });
+   932	  }, []);
+   933	
+   934	  const registerBlock = useCallback(
+   935	    (id: number) => (el: HTMLElement | null) => {
+   936	      if (el) blocks.current.set(id, el);
+   937	      else blocks.current.delete(id);
+   938	    },
+   939	    [],
+   940	  );
+   941	
+   942	  const registerItem = useCallback(
+   943	    (id: string) => (el: HTMLElement | null) => {
+   944	      if (el) items.current.set(id, el);
+   945	      else items.current.delete(id);
+   946	    },
+   947	    [],
+   948	  );
+   949	
+   950	  return { activeId, flash, selectFromList, selectFromDocument, registerBlock, registerItem };
+   951	}

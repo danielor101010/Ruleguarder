@@ -1,0 +1,1036 @@
+=== App.tsx
+import { useCallback, useEffect, useState } from "react";
+import { api } from "./api";
+import DocumentsPanel from "./components/DocumentsPanel";
+import ReportView from "./components/ReportView";
+import RulesPanel from "./components/RulesPanel";
+import { errorMessage, useDocumentReport } from "./hooks/useDocumentReport";
+import type { DocumentSummary, Rule } from "./types";
+
+export default function App() {
+  const [rules, setRules] = useState<Rule[]>([]);
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [listError, setListError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const report = useDocumentReport(selectedId);
+
+  const loadRules = useCallback(
+    () => api.rules().then(setRules).catch((e: unknown) => setListError(errorMessage(e))),
+    [],
+  );
+  const loadDocuments = useCallback(
+    () => api.documents().then(setDocuments).catch((e: unknown) => setListError(errorMessage(e))),
+    [],
+  );
+
+  useEffect(() => {
+    void loadRules();
+    void loadDocuments();
+  }, [loadRules, loadDocuments]);
+
+  const error = report.error ?? listError;
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <h1>Ruleguarder</h1>
+        <span className="muted">Check Word documents against your rules</span>
+      </header>
+      <div className="layout">
+        <aside className="sidebar">
+          <RulesPanel rules={rules} onChange={loadRules} />
+          <DocumentsPanel
+            documents={documents}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onChange={loadDocuments}
+          />
+        </aside>
+        <main className="main">
+          {error && <p className="error banner">{error}</p>}
+          {report.document ? (
+            <ReportView
+              key={`${report.document.id}-${report.checkedAt ?? "unchecked"}`}
+              document={report.document}
+              violations={report.violations}
+              checking={report.checking}
+              checkedAt={report.checkedAt}
+              onCheck={report.runCheck}
+            />
+          ) : (
+            <div className="empty">
+              {report.loading ? (
+                <p>Loading…</p>
+              ) : (
+                <>
+                  <p>1. Create rules on the left (e.g. “no numeric figures that reveal system performance”).</p>
+                  <p>2. Upload a .docx document.</p>
+                  <p>3. Click “Check document” to see every violation and where it is.</p>
+                </>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+=== api.ts
+import type { DocumentFull, DocumentSummary, Report, Rule, RuleInput, RuleType } from "./types";
+
+const BASE = "/api";
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+async function send(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(BASE + path, init);
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      message = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, message);
+  }
+  return res;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await send(path, init);
+  return (await res.json()) as T;
+}
+
+async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
+  await send(path, init);
+}
+
+const json = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+export const api = {
+  ruleTypes: () => request<RuleType[]>("/rules/types"),
+  rules: () => request<Rule[]>("/rules"),
+  createRule: (rule: RuleInput) => request<Rule>("/rules", json("POST", rule)),
+  updateRule: (id: number, changes: Partial<RuleInput>) => request<Rule>(`/rules/${id}`, json("PATCH", changes)),
+  deleteRule: (id: number) => requestNoContent(`/rules/${id}`, { method: "DELETE" }),
+
+  documents: () => request<DocumentSummary[]>("/documents"),
+  document: (id: number) => request<DocumentFull>(`/documents/${id}`),
+  uploadDocument: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<DocumentFull>("/documents", { method: "POST", body: form });
+  },
+  deleteDocument: (id: number) => requestNoContent(`/documents/${id}`, { method: "DELETE" }),
+  check: (id: number) => request<Report>(`/documents/${id}/check`, json("POST", {})),
+  latestReport: (id: number) => request<Report>(`/documents/${id}/report`),
+};
+=== types.ts
+export type Severity = "low" | "medium" | "high";
+
+export const SEVERITIES: readonly Severity[] = ["high", "medium", "low"];
+
+export interface Run {
+  start: number;
+  end: number;
+  text: string;
+  font: string | null;
+  size_pt: number | null;
+  bold: boolean | null;
+  italic: boolean | null;
+}
+
+export interface Block {
+  id: number;
+  kind: "paragraph" | "heading" | "table_cell";
+  text: string;
+  style: string | null;
+  heading_level: number | null;
+  heading_context: string | null;
+  label: string;
+  paragraph_index: number | null;
+  table_index: number | null;
+  row: number | null;
+  col: number | null;
+  runs: Run[];
+}
+
+export interface DocumentSummary {
+  id: number;
+  filename: string;
+  size_bytes: number;
+  uploaded_at: string;
+}
+
+export interface DocumentFull extends DocumentSummary {
+  blocks: Block[];
+}
+
+export interface Rule {
+  id: number;
+  name: string;
+  description: string;
+  type: string;
+  params: Record<string, unknown>;
+  severity: Severity;
+  enabled: boolean;
+  created_at: string;
+}
+
+export type RuleInput = Omit<Rule, "id" | "created_at">;
+
+/** Subset of JSON Schema that pydantic produces for rule params. */
+export interface ParamSchema {
+  type?: "string" | "integer" | "number" | "boolean" | "array";
+  title?: string;
+  description?: string;
+  default?: unknown;
+  format?: string;
+  items?: { type?: string };
+}
+
+export interface RuleType {
+  key: string;
+  label: string;
+  description: string;
+  params_schema: {
+    properties: Record<string, ParamSchema>;
+    required?: string[];
+  };
+}
+
+export interface Violation {
+  id: string;
+  rule_id: number;
+  rule_name: string;
+  severity: Severity;
+  message: string;
+  block_id: number | null;
+  start: number | null;
+  end: number | null;
+  excerpt: string;
+  location: string;
+}
+
+export interface Report {
+  check_id: number;
+  checked_at: string;
+  document: DocumentFull;
+  violations: Violation[];
+  summary: { total: number; by_severity: Partial<Record<Severity, number>>; rules_checked: number };
+}
+=== main.tsx
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./styles.css";
+
+const root = document.getElementById("root");
+if (!root) throw new Error("Missing #root element");
+
+createRoot(root).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
+=== hooks/useDocumentReport.ts
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError } from "../api";
+import type { DocumentFull, Violation } from "../types";
+
+export interface DocumentReportState {
+  document: DocumentFull | null;
+  /** null => document not checked yet */
+  violations: Violation[] | null;
+  checkedAt: string | null;
+  loading: boolean;
+  checking: boolean;
+  error: string | null;
+}
+
+const EMPTY: DocumentReportState = {
+  document: null,
+  violations: null,
+  checkedAt: null,
+  loading: false,
+  checking: false,
+  error: null,
+};
+
+/** Loads the latest report for a document (or the bare document if never checked) and runs checks. */
+export function useDocumentReport(documentId: number | null) {
+  const [state, setState] = useState<DocumentReportState>(EMPTY);
+  const [loadedId, setLoadedId] = useState<number | null>(null);
+
+  // Reset during render when the selection changes (avoids setState inside an effect)
+  if (loadedId !== documentId) {
+    setLoadedId(documentId);
+    setState({ ...EMPTY, loading: documentId !== null });
+  }
+
+  useEffect(() => {
+    if (documentId === null) return;
+    let cancelled = false;
+    load(documentId)
+      .then((next) => !cancelled && setState({ ...EMPTY, ...next }))
+      .catch((err: unknown) => !cancelled && setState({ ...EMPTY, error: errorMessage(err) }));
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId]);
+
+  const runCheck = useCallback(async () => {
+    if (documentId === null) return;
+    setState((s) => ({ ...s, checking: true, error: null }));
+    try {
+      const report = await api.check(documentId);
+      setState({
+        ...EMPTY,
+        document: report.document,
+        violations: report.violations,
+        checkedAt: report.checked_at,
+      });
+    } catch (err) {
+      setState((s) => ({ ...s, checking: false, error: errorMessage(err) }));
+    }
+  }, [documentId]);
+
+  return { ...state, runCheck };
+}
+
+async function load(documentId: number): Promise<Partial<DocumentReportState>> {
+  try {
+    const report = await api.latestReport(documentId);
+    return { document: report.document, violations: report.violations, checkedAt: report.checked_at };
+  } catch (err) {
+    if (!(err instanceof ApiError && err.status === 404)) throw err;
+    return { document: await api.document(documentId) };
+  }
+}
+
+export function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+=== lib/highlight.ts
+import type { Severity, Violation } from "../types";
+
+export const SEVERITY_RANK: Record<Severity, number> = { low: 0, medium: 1, high: 2 };
+
+/** A violation that points at a character range inside its block. */
+export type SpanViolation = Violation & { start: number; end: number };
+
+export interface Segment {
+  text: string;
+  violations: SpanViolation[];
+}
+
+export function hasSpan(v: Violation): v is SpanViolation {
+  return v.start !== null && v.end !== null;
+}
+
+export function worstSeverity(violations: readonly Violation[]): Severity {
+  return violations.reduce<Severity>(
+    (worst, v) => (SEVERITY_RANK[v.severity] > SEVERITY_RANK[worst] ? v.severity : worst),
+    "low",
+  );
+}
+
+/**
+ * Split text at every violation boundary so overlapping violations render correctly.
+ * Each segment lists the violations that fully cover it. Offsets are clamped to the text.
+ */
+export function segmentText(text: string, violations: readonly Violation[]): Segment[] {
+  const spans = violations.filter(hasSpan);
+  const clamp = (n: number) => Math.max(0, Math.min(text.length, n));
+  const cuts = new Set<number>([0, text.length]);
+  for (const v of spans) {
+    cuts.add(clamp(v.start));
+    cuts.add(clamp(v.end));
+  }
+  const points = [...cuts].sort((a, b) => a - b);
+
+  const segments: Segment[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const [a, b] = [points[i], points[i + 1]];
+    if (a === b) continue;
+    segments.push({
+      text: text.slice(a, b),
+      violations: spans.filter((v) => clamp(v.start) <= a && clamp(v.end) >= b),
+    });
+  }
+  return segments;
+}
+
+/** Group violations by block; document-level ones (block_id null) are skipped. */
+export function violationsByBlock(violations: readonly Violation[]): Map<number, Violation[]> {
+  const map = new Map<number, Violation[]>();
+  for (const v of violations) {
+    if (v.block_id === null) continue;
+    const list = map.get(v.block_id);
+    if (list) list.push(v);
+    else map.set(v.block_id, [v]);
+  }
+  return map;
+}
+
+export function countBySeverity(violations: readonly Violation[]): Partial<Record<Severity, number>> {
+  const counts: Partial<Record<Severity, number>> = {};
+  for (const v of violations) counts[v.severity] = (counts[v.severity] ?? 0) + 1;
+  return counts;
+}
+=== lib/layout.ts
+import type { Block } from "../types";
+
+export interface TableLayout {
+  kind: "table";
+  tableIndex: number;
+  rows: number;
+  cols: number;
+  /** cells[row][col] -> blocks in that cell (0-based) */
+  cells: Block[][][];
+}
+
+export type LayoutItem = { kind: "block"; block: Block } | TableLayout;
+
+/** Paragraphs/headings stay in order; consecutive table-cell blocks are grouped back into tables. */
+export function layoutBlocks(blocks: readonly Block[]): LayoutItem[] {
+  const items: LayoutItem[] = [];
+  let i = 0;
+  while (i < blocks.length) {
+    const block = blocks[i];
+    const tableIndex = block.table_index;
+    if (tableIndex === null) {
+      items.push({ kind: "block", block });
+      i++;
+      continue;
+    }
+    const tableBlocks: Block[] = [];
+    while (i < blocks.length && blocks[i].table_index === tableIndex) tableBlocks.push(blocks[i++]);
+    items.push(buildTable(tableIndex, tableBlocks));
+  }
+  return items;
+}
+
+function buildTable(tableIndex: number, blocks: Block[]): TableLayout {
+  const rows = Math.max(1, ...blocks.map((b) => b.row ?? 1));
+  const cols = Math.max(1, ...blocks.map((b) => b.col ?? 1));
+  const cells: Block[][][] = Array.from({ length: rows }, () => Array.from({ length: cols }, () => []));
+  for (const b of blocks) cells[(b.row ?? 1) - 1][(b.col ?? 1) - 1].push(b);
+  return { kind: "table", tableIndex, rows, cols, cells };
+}
+=== components/DocumentsPanel.tsx
+import { useRef, useState } from "react";
+import { api } from "../api";
+import type { DocumentSummary } from "../types";
+
+interface Props {
+  documents: DocumentSummary[];
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+  onChange: () => void;
+}
+
+export default function DocumentsPanel({ documents, selectedId, onSelect, onChange }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function upload(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const doc = await api.uploadDocument(file);
+      onChange();
+      onSelect(doc.id);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function remove(doc: DocumentSummary) {
+    await api.deleteDocument(doc.id);
+    if (doc.id === selectedId) onSelect(null);
+    onChange();
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <h2>Documents</h2>
+        <button onClick={() => inputRef.current?.click()} disabled={uploading}>
+          {uploading ? "Uploading…" : "Upload .docx"}
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          hidden
+          onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+        />
+      </div>
+      {error && <p className="error">{error}</p>}
+      {!documents.length && <p className="muted">No documents uploaded yet.</p>}
+      <ul className="list">
+        {documents.map((doc) => (
+          <li
+            key={doc.id}
+            className={`clickable ${doc.id === selectedId ? "selected" : ""}`}
+            onClick={() => onSelect(doc.id)}
+          >
+            <div className="grow">
+              <div dir="auto">{doc.filename}</div>
+              <div className="muted small">
+                {(doc.size_bytes / 1024).toFixed(0)} KB · {new Date(doc.uploaded_at).toLocaleString()}
+              </div>
+            </div>
+            <button
+              className="link danger"
+              onClick={(e) => {
+                e.stopPropagation();
+                remove(doc);
+              }}
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+=== components/ReportView.test.tsx
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DOC, violation } from "../test/fixtures";
+import ReportView from "./ReportView";
+
+const scrollIntoView = vi.fn();
+
+beforeEach(() => {
+  scrollIntoView.mockClear();
+  Element.prototype.scrollIntoView = scrollIntoView;
+});
+
+const SPAN = violation({ id: "1-0", rule_name: "No figures", message: "Reveals range", block_id: 1, start: 23, end: 28 });
+const WHOLE = violation({ id: "2-0", rule_name: "Cell rule", message: "Bad cell", block_id: 3 }, "medium");
+const DOC_LEVEL = violation({ id: "3-0", rule_name: "Banner", message: "Missing banner", block_id: null, location: "Whole document" });
+
+function setup(violations = [SPAN, WHOLE, DOC_LEVEL]) {
+  const onCheck = vi.fn();
+  render(<ReportView document={DOC} violations={violations} checking={false} checkedAt={null} onCheck={onCheck} />);
+  return { onCheck };
+}
+
+describe("ReportView", () => {
+  it("highlights the exact span of a violation", () => {
+    setup();
+    const mark = screen.getByText("50 km");
+    expect(mark.tagName).toBe("MARK");
+    expect(mark).toHaveClass("sev-high");
+    expect(mark).toHaveAttribute("title", "No figures: Reveals range");
+  });
+
+  it("flags the whole block when there is no span, inside the table", () => {
+    setup();
+    const cell = screen.getByText("2 seconds").closest("p");
+    expect(cell).toHaveClass("flagged", "sev-medium");
+    expect(cell?.closest("td")).not.toBeNull();
+  });
+
+  it("scrolls to the block and marks it active when a violation is clicked", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: /No figures/ }));
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    expect(screen.getByText("50 km")).toHaveClass("active");
+    expect(screen.getByRole("button", { name: /No figures/ })).toHaveClass("active");
+  });
+
+  it("does not scroll for document-level violations", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: /Banner/ }));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("clicking a highlight selects its violation", async () => {
+    setup();
+    await userEvent.click(screen.getByText("50 km"));
+    expect(screen.getByRole("button", { name: /No figures/ })).toHaveClass("active");
+  });
+
+  it("shows severity counts and runs a re-check", async () => {
+    const { onCheck } = setup();
+    const toolbar = screen.getByRole("heading", { name: "spec.docx" }).parentElement as HTMLElement;
+    expect(within(toolbar).getByText("2 high")).toBeInTheDocument();
+    expect(within(toolbar).getByText("1 medium")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Re-check" }));
+    expect(onCheck).toHaveBeenCalledOnce();
+  });
+
+  it("shows the empty and unchecked states", () => {
+    const { unmount } = render(
+      <ReportView document={DOC} violations={[]} checking={false} checkedAt={null} onCheck={vi.fn()} />,
+    );
+    expect(screen.getByText(/No violations found/)).toBeInTheDocument();
+    unmount();
+    render(<ReportView document={DOC} violations={null} checking={false} checkedAt={null} onCheck={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Check document" })).toBeInTheDocument();
+  });
+});
+=== components/ReportView.tsx
+import { createElement, useMemo, useRef, useState } from "react";
+import { countBySeverity, hasSpan, segmentText, violationsByBlock, worstSeverity } from "../lib/highlight";
+import { layoutBlocks } from "../lib/layout";
+import { SEVERITIES, type Block, type DocumentFull, type Violation } from "../types";
+
+interface Props {
+  document: DocumentFull;
+  violations: Violation[] | null; // null => not checked yet
+  checking: boolean;
+  checkedAt: string | null;
+  onCheck: () => void;
+}
+
+/** Render with a `key` that changes per document/report, so the active selection resets. */
+export default function ReportView({ document, violations, checking, checkedAt, onCheck }: Props) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const blockRefs = useRef(new Map<number, HTMLElement>());
+
+  const byBlock = useMemo(() => violationsByBlock(violations ?? []), [violations]);
+
+  function focus(v: Violation) {
+    setActiveId(v.id);
+    if (v.block_id !== null) {
+      blockRefs.current.get(v.block_id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  const registerBlock = (id: number) => (el: HTMLElement | null) => {
+    if (el) blockRefs.current.set(id, el);
+    else blockRefs.current.delete(id);
+  };
+
+  const counts = countBySeverity(violations ?? []);
+
+  return (
+    <div className="report">
+      <div className="report-toolbar">
+        <h2 dir="auto">{document.filename}</h2>
+        <div className="grow" />
+        {violations && (
+          <span className="summary">
+            {violations.length === 0 ? (
+              <span className="ok">No violations found ✓</span>
+            ) : (
+              SEVERITIES
+                .map((s) => [s, counts[s] ?? 0] as const)
+                .filter(([, n]) => n > 0)
+                .map(([s, n]) => (
+                  <span key={s} className={`pill sev-${s}`}>
+                    {n} {s}
+                  </span>
+                ))
+            )}
+          </span>
+        )}
+        {checkedAt && <span className="muted small">Checked {new Date(checkedAt).toLocaleString()}</span>}
+        <button onClick={onCheck} disabled={checking}>
+          {checking ? "Checking…" : violations ? "Re-check" : "Check document"}
+        </button>
+      </div>
+
+      <div className="report-body">
+        <article className="doc">
+          <DocumentBody
+            blocks={document.blocks}
+            byBlock={byBlock}
+            activeId={activeId}
+            onPick={focus}
+            registerBlock={registerBlock}
+          />
+        </article>
+
+        <aside className="violations">
+          <h3>Violations</h3>
+          {checking && <p className="muted">The AI is reading the document… this can take a minute for long documents.</p>}
+          {!checking && violations === null && <p className="muted">Not checked yet. Click “Check document”.</p>}
+          {violations?.map((v) => (
+            <button
+              key={v.id}
+              className={`violation sev-${v.severity} ${v.id === activeId ? "active" : ""}`}
+              onClick={() => focus(v)}
+            >
+              <div className="violation-head">
+                <span className={`dot sev-${v.severity}`} />
+                <strong dir="auto">{v.rule_name}</strong>
+              </div>
+              <div dir="auto">{v.message}</div>
+              {v.excerpt && (
+                <div className="excerpt" dir="auto">
+                  {v.excerpt}
+                </div>
+              )}
+              <div className="muted small" dir="auto">
+                📍 {v.location}
+              </div>
+            </button>
+          ))}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+interface CommonProps {
+  byBlock: Map<number, Violation[]>;
+  activeId: string | null;
+  onPick: (v: Violation) => void;
+  registerBlock: (id: number) => (el: HTMLElement | null) => void;
+}
+
+function DocumentBody({ blocks, ...props }: CommonProps & { blocks: Block[] }) {
+  return (
+    <>
+      {layoutBlocks(blocks).map((item) =>
+        item.kind === "block" ? (
+          <BlockView key={item.block.id} block={item.block} {...props} />
+        ) : (
+          <div key={`t${item.tableIndex}`} className="table-wrap">
+            <table dir="auto">
+              <tbody>
+                {item.cells.map((row, r) => (
+                  <tr key={r}>
+                    {row.map((cellBlocks, c) => (
+                      <td key={c}>
+                        {cellBlocks.map((b) => (
+                          <BlockView key={b.id} block={b} {...props} />
+                        ))}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ),
+      )}
+    </>
+  );
+}
+
+function tooltip(violations: readonly Violation[]): string {
+  return violations.map((v) => `${v.rule_name}: ${v.message}`).join("\n");
+}
+
+function headingTag(block: Block): "p" | "h3" | "h4" | "h5" | "h6" {
+  if (block.kind !== "heading") return "p";
+  const level = Math.min(Math.max(block.heading_level ?? 1, 1) + 2, 6);
+  return `h${level}` as "h3" | "h4" | "h5" | "h6";
+}
+
+function BlockView({ block, byBlock, activeId, onPick, registerBlock }: CommonProps & { block: Block }) {
+  const violations = byBlock.get(block.id) ?? [];
+  // Violations without a span (quote not found) flag the whole block
+  const wholeBlock = violations.filter((v) => !hasSpan(v));
+  const flagged = wholeBlock.length > 0;
+  const blockActive = wholeBlock.some((v) => v.id === activeId);
+  const children = block.text
+    ? segmentText(block.text, violations).map((seg, i) =>
+        seg.violations.length ? (
+          <mark
+            key={i}
+            className={`hl sev-${worstSeverity(seg.violations)} ${seg.violations.some((v) => v.id === activeId) ? "active" : ""}`}
+            title={tooltip(seg.violations)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick(seg.violations[0]);
+            }}
+          >
+            {seg.text}
+          </mark>
+        ) : (
+          <span key={i}>{seg.text}</span>
+        ),
+      )
+    : " ";
+
+  return createElement(
+    headingTag(block),
+    {
+      ref: registerBlock(block.id),
+      dir: "auto",
+      className: `block ${flagged ? `flagged sev-${worstSeverity(wholeBlock)}` : ""} ${blockActive ? "active" : ""}`,
+      onClick: flagged ? () => onPick(wholeBlock[0]) : undefined,
+      title: flagged ? tooltip(wholeBlock) : undefined,
+    },
+    children,
+  );
+}
+=== components/RulesPanel.tsx
+import { useEffect, useState } from "react";
+import { api } from "../api";
+import type { ParamSchema, Rule, RuleInput, RuleType, Severity } from "../types";
+
+interface Props {
+  rules: Rule[];
+  onChange: () => void;
+}
+
+export default function RulesPanel({ rules, onChange }: Props) {
+  const [types, setTypes] = useState<RuleType[]>([]);
+  const [editing, setEditing] = useState<Rule | "new" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.ruleTypes().then(setTypes).catch((e) => setError(e.message));
+  }, []);
+
+  const typeLabel = (key: string) => types.find((t) => t.key === key)?.label ?? key;
+
+  async function toggle(rule: Rule) {
+    await api.updateRule(rule.id, { enabled: !rule.enabled });
+    onChange();
+  }
+
+  async function remove(rule: Rule) {
+    await api.deleteRule(rule.id);
+    onChange();
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <h2>Rules</h2>
+        <button onClick={() => setEditing("new")} disabled={!types.length}>
+          + New rule
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+
+      {editing && (
+        <RuleForm
+          types={types}
+          rule={editing === "new" ? null : editing}
+          onCancel={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            onChange();
+          }}
+        />
+      )}
+
+      {!rules.length && !editing && <p className="muted">No rules yet. Create one to start checking documents.</p>}
+      <ul className="list">
+        {rules.map((rule) => (
+          <li key={rule.id} className={rule.enabled ? "" : "disabled"}>
+            <label className="rule-toggle" title={rule.enabled ? "Enabled" : "Disabled"}>
+              <input type="checkbox" checked={rule.enabled} onChange={() => toggle(rule)} />
+            </label>
+            <div className="grow">
+              <div className="rule-name" dir="auto">
+                <span className={`dot sev-${rule.severity}`} /> {rule.name}
+              </div>
+              <div className="muted small" dir="auto">
+                {typeLabel(rule.type)}
+                {rule.type === "llm" && typeof rule.params.instruction === "string" && ` · ${rule.params.instruction}`}
+              </div>
+            </div>
+            <button className="link" onClick={() => setEditing(rule)}>
+              Edit
+            </button>
+            <button className="link danger" onClick={() => remove(rule)}>
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function defaultsFor(type: RuleType | undefined): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [name, schema] of Object.entries(type?.params_schema.properties ?? {})) {
+    out[name] = schema.default ?? (schema.type === "boolean" ? false : schema.type === "array" ? [] : "");
+  }
+  return out;
+}
+
+function RuleForm({
+  types,
+  rule,
+  onCancel,
+  onSaved,
+}: {
+  types: RuleType[];
+  rule: Rule | null;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [typeKey, setTypeKey] = useState(rule?.type ?? types[0]?.key ?? "");
+  const type = types.find((t) => t.key === typeKey);
+  const [name, setName] = useState(rule?.name ?? "");
+  const [severity, setSeverity] = useState<Severity>(rule?.severity ?? "high");
+  const [params, setParams] = useState<Record<string, unknown>>(rule?.params ?? defaultsFor(type));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  function changeType(key: string) {
+    setTypeKey(key);
+    setParams(defaultsFor(types.find((t) => t.key === key)));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      if (rule) {
+        await api.updateRule(rule.id, { name, severity, params });
+      } else {
+        const input: RuleInput = { name, description: "", type: typeKey, params, severity, enabled: true };
+        await api.createRule(input);
+      }
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="card rule-form" onSubmit={submit}>
+      <label>
+        Type
+        <select value={typeKey} onChange={(e) => changeType(e.target.value)} disabled={!!rule}>
+          {types.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {type && <p className="muted small">{type.description}</p>}
+
+      <label>
+        Name
+        <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} required />
+      </label>
+
+      {Object.entries(type?.params_schema.properties ?? {}).map(([key, schema]) => (
+        <ParamField
+          key={key}
+          name={key}
+          schema={schema}
+          required={type?.params_schema.required?.includes(key) ?? false}
+          value={params[key]}
+          onChange={(v) => setParams((p) => ({ ...p, [key]: v }))}
+        />
+      ))}
+
+      <label>
+        Severity
+        <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity)}>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </label>
+
+      {error && <p className="error">{error}</p>}
+      <div className="row">
+        <button type="submit" disabled={saving}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button type="button" className="secondary" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ParamField({
+  name,
+  schema,
+  required,
+  value,
+  onChange,
+}: {
+  name: string;
+  schema: ParamSchema;
+  required: boolean;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const label = schema.title ?? name;
+
+  if (schema.type === "boolean") {
+    return (
+      <label className="checkbox">
+        <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
+        {label}
+      </label>
+    );
+  }
+
+  let input: React.ReactNode;
+  if (schema.type === "array") {
+    input = (
+      <input
+        dir="auto"
+        value={Array.isArray(value) ? value.join(", ") : ""}
+        placeholder="Comma separated"
+        onChange={(e) =>
+          onChange(
+            e.target.value
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+          )
+        }
+        required={required}
+      />
+    );
+  } else if (schema.type === "integer" || schema.type === "number") {
+    input = (
+      <input
+        type="number"
+        step={schema.type === "integer" ? 1 : "any"}
+        value={value === undefined || value === null ? "" : String(value)}
+        onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+        required={required}
+      />
+    );
+  } else if (schema.format === "textarea") {
+    input = (
+      <textarea dir="auto" rows={4} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} required={required} />
+    );
+  } else {
+    input = <input dir="auto" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} required={required} />;
+  }
+
+  return (
+    <label>
+      {label}
+      {input}
+      {schema.description && <span className="muted small">{schema.description}</span>}
+    </label>
+  );
+}
